@@ -1,7 +1,0 @@
-python library
-
-pandas_plink numpy pandas sklearn rpy2
-
-R package
-
-bigsnpr

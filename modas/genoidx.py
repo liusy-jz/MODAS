@@ -2,7 +2,7 @@ from pandas_plink import read_plink1_bin
 from sklearn.cluster import DBSCAN
 from sklearn.decomposition import PCA
 from multiprocessing import cpu_count
-import multiprocess as mp
+import modas.multiprocess as mp
 import numpy as np
 import pandas as pd
 from collections import Counter

@@ -1,9 +1,9 @@
-#!/usr/bin/python3
+#!/usr/bin/env python
 import sys, time
-import genoidx as gi
-import phenorm as pn
-import prescreen as ps
-import localgwas as lg
+import modas.genoidx as gi
+import modas.phenorm as pn
+import modas.prescreen as ps
+import modas.localgwas as lg
 import pandas as pd
 import numpy as np
 import datetime

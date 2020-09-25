@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-import multiprocess as mp
+import modas.multiprocess as mp
 from sklearn.preprocessing import MinMaxScaler
 import os,glob
 

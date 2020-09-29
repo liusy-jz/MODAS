@@ -157,16 +157,20 @@ def read_genotype(geno_prefix):
         return None
     return G
 
+
 def snp_clumping(bed, r2, out):
     from rpy2.robjects.packages import importr
     from rpy2.robjects import pandas2ri
-    pandas2ri.activate()
+    import rpy2.robjects as ro
+    from rpy2.robjects.conversion import localconverter
     base = importr('base')
     bigsnpr = importr('bigsnpr')
     g = bigsnpr.snp_readBed(bed, backingfile=base.tempfile())
     g = bigsnpr.snp_attach(g)
-    snp_keep = bigsnpr.snp_clumping(g[0], infos_chr=g[2].rx2('chromosome'), infos_pos=g[2].rx2('physical.pos'),
-                                    thr_r2=r2, ncores=cpu_count() / 4)
+    with localconverter(ro.default_converter + pandas2ri.converter):
+        plink_map = ro.conversion.py2rpy(g[2])
+    snp_keep = bigsnpr.snp_clumping(g[0], infos_chr=plink_map.rx2('chromosome'), infos_pos=plink_map.rx2('physical.pos'),
+                                    thr_r2=r2)
     g_clump = bigsnpr.subset_bigSNP(g, ind_col=snp_keep)
     g_clump = bigsnpr.snp_attach(g_clump)
     bigsnpr.snp_writeBed(g_clump, out)

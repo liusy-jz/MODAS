@@ -58,7 +58,7 @@ def generate_clump_input(dir,num_threads):
     if os.path.exists('./clump_input'):
         shutil.rmtree('./clump_input')
     os.mkdir('./clump_input')
-    cmd = '''awk '{if(NR==1)print "SNP\\tP"; else print $2"\\t"$11}' '''
+    cmd = '''awk '{if(NR==1)print "SNP\\tP"; else print $2"\\t"$12}' '''
     cmds = list()
     fns = list()
     for fn in glob.glob(dir.strip('/')+'/*_plink.assoc.txt'):

@@ -19,11 +19,11 @@ setup(name='MODAS',
     license='GPLv3',
     packages=["modas"],
     scripts=['MODAS.py'],
-    install_requires = [
+    install_requires=[
         'pandas_plink',
         'numpy',
         'pandas',
-        'sklearn',
+        'scikit-learn',
         'rpy2>=3.3.5',
         'tzlocal'
     ]

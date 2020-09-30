@@ -8,6 +8,7 @@ conda activate modas
 python setup.py build
 python setup.py install
 
+pip install cffi    # if the version of cffi less than required version
 conda install -y -c conda-forge r-rcppeigen r=3.6
 Rscript -e 'install.packages("Matrix")'
 Rscript -e 'install.packages("bigsnpr")'

@@ -197,9 +197,17 @@ def localgwas(args,log):
     log.log('begin generate QTL of phenotypes...')
     s = lg.generate_clump_input('output',args.p)
     s = lg.plink_clump('tmp_qtl_bed', args.p1, args.p2, args.p)
-    qtl_res = lg.generate_qtl('clump_result')
+    qtl_res, bad_qtl = lg.generate_qtl('clump_result')
+    qtl_res.index = np.arange(qtl_res.shape[0])
     qtl_res.to_csv(args.o+'.local_gwas_qtl_res.csv',index=False)
+    bad_qtl.to_csv(args.o+'.local_gwas_bad_qtl_res.csv',index=False)
     log.log('generate QTL done.')
+    if args.cluster:
+        log.log('begin cluster phenotype analysis...')
+        clustered_phe, phe_labeled = lg.phe_PCA(phe, qtl_res)
+        clustered_phe.to_csv(args.o+'.clustered_phe.csv')
+        phe_labeled.to_csv(args.o+'.phe_labeled.csv')
+        log.log('cluster phenotype analysis done')
     log.log('local gwas analysis is finished.')
 
 
@@ -254,6 +262,7 @@ parser_localgwas.add_argument('-phe', metavar='', help='input phenotype file')
 parser_localgwas.add_argument('-phe_sig_qtl', metavar='', help='significant phenotype QTL region file')
 parser_localgwas.add_argument('-p1', metavar='', help='significance threshold for index SNPs')
 parser_localgwas.add_argument('-p2', metavar='', help='secondary significance threshold for clumped SNPs')
+parser_localgwas.add_argument('-cluster', action='store_true', help='cluster phenotype by qtl result')
 parser_localgwas.add_argument('-p', default=1, type=int, metavar='[default:1]', help='number of threads for local gwas analysis')
 parser_localgwas.add_argument('-o', default='MODAS_localgwas_out', metavar='', help='output file prefix')
 

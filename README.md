@@ -9,9 +9,11 @@ python setup.py build
 python setup.py install
 
 pip install cffi    # if the version of cffi less than required version
-conda install -y -c conda-forge r-rcppeigen r=3.6
-Rscript -e 'install.packages("Matrix")'
-Rscript -e 'install.packages("bigsnpr")'
+conda install -y -c conda-forge r-rcppeigen r=3.6 rpy2
+Rscript -e 'install.packages("data.table")'
+Rscript -e 'install.packages("ggplot2")'
+Rscript -e 'install.packages("ggsignif")'
+Rscript -e 'install.packages("bigsnpr",dependence=T)'
 ```
 
 ## A toy try

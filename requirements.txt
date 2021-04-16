@@ -1,6 +1,8 @@
+Cython
+yattag
+pyranges
 pandas_plink
 numpy
 pandas
+scipy
 sklearn
-rpy2>=3.3.5
-tzlocal

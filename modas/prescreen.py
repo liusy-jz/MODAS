@@ -5,7 +5,7 @@ from sklearn.preprocessing import MinMaxScaler
 import os,glob
 
 def qtl_pc2bimbam(qtl_pc):
-    qtl_pc.loc[:,:] = MinMaxScaler(feature_range=(0, 2)).fit_transform(qtl_pc.values)
+    #qtl_pc.loc[:,:] = np.around(MinMaxScaler(feature_range=(0, 2)).fit_transform(qtl_pc.values),decimals=3)
     g = qtl_pc.T.reset_index()
     g.insert(1,'minor',['A']*g.shape[0])
     g.insert(2,'major',['T']*g.shape[0])
@@ -22,7 +22,7 @@ def qtl_pc_genotype_subset(g,a,rs,output_dir,phe):
     sub_a.to_csv(output_dir+'tmp_'+phe.replace('m/z','m.z')+'.anno.txt',index=False,header=None)
 
 
-def generate_metabolite_qtl_pc_bimbam(omics_phe,a,g,lm_suggest_pvalue,threads):
+def generate_omics_qtl_pc_bimbam(omics_phe,a,g,lm_suggest_pvalue,threads):
     prefix = 'tmp_metabolite_bimbam/'
     #subset_genotype_args = list()
     g.index = g['index']
@@ -54,9 +54,16 @@ def qtl_pc_lm_gwas_parallel(omics_phe,bimbam_dir,threads,geno):
     return s
 
 
-def qtl_pc_lmm_gwas_parallel(omics_phe,bimbam_dir,threads,geno):
+def qtl_pc_lmm_gwas_parallel(omics_phe,bimbam_dir,threads,geno,sample_id):
     qtl_pc_lmm_args = list()
+    #g = read_plink1_bin(geno+'.bed', geno+'.bim', geno+'.fam', verbose=False)
+    #g = g.sel(sample=sample_id)
     geno_prefix = geno.split('/')[-1]
+    #if os.path.exists(geno_prefix+'.link.bed'):
+    #    os.remove(geno_prefix+'.link.bed')
+    #if os.path.exists(geno_prefix+'.link.bim'):
+    #    os.remove(geno_prefix+'.link.bim')
+    #write_plink1_bin(g,geno_prefix+'.link.bed', geno_prefix+'.link.bim,', geno_prefix+'.link.fam',verbose=False)
     fam = pd.read_csv(geno+'.fam', sep=r'\s+', header=None)
     fam[5] = 1
     fam.to_csv(geno_prefix+'.link.fam', sep='\t', na_rep='NA', header=None, index=False)

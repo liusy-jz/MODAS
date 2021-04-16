@@ -2,13 +2,20 @@ from pandas_plink import read_plink1_bin
 from sklearn.cluster import DBSCAN
 from sklearn.decomposition import PCA
 from multiprocessing import cpu_count
+from sklearn.preprocessing import MinMaxScaler
+#from rpy2.robjects.packages import importr
+#from rpy2.robjects import pandas2ri
+import warnings
 import modas.multiprocess as mp
 import numpy as np
 import pandas as pd
 from collections import Counter
 import struct
 
-
+#pandas2ri.activate()
+#base = importr('base')
+#bigsnpr = importr('bigsnpr')
+warnings.filterwarnings("ignore")
 
 
 def convert(g, n):
@@ -79,37 +86,44 @@ def hap2plink_bed(hap, plink):
         return True
 
 def optimal_cluster(g):
-    cluster = DBSCAN(eps=0.2, min_samples=10, metric='jaccard').fit(g.T)
-    if sum(cluster.labels_ == -1) < g.shape[1]*0.3:
-        return cluster
-    else:
-        cluster = DBSCAN(eps=0.35, min_samples=5, metric='jaccard').fit(g.T)
-        return cluster
+        cluster = DBSCAN(eps=0.2, min_samples=10, metric='jaccard').fit(g.T)
+        if sum(cluster.labels_ == -1) < g.shape[1]*0.3:
+            return cluster
+        else:
+            cluster = DBSCAN(eps=0.35, min_samples=5, metric='jaccard').fit(g.T)
+            return cluster
 
 
 def cluster_PCA(g,index,colname_prefix):
-    g = np.array(g)
-    g[g == 2] = 4
-    g[g == 0] = 2
-    g[g == 4] = 0
+    g = g.values
     g_std = g - np.mean(g, axis=0)
     cluster = optimal_cluster(g)
     pca = PCA(n_components=3)
     window_res = pd.DataFrame()
+    #cluster_variant = pd.DataFrame()
     for label in np.unique(cluster.labels_):
         if label != -1 and sum(cluster.labels_ == label) >= 10:
             g_sub = g_std[:, cluster.labels_ == label]
-            pca.fit(g_sub)
+            try:
+                pca.fit(g_sub)
+            except np.linalg.LinAlgError:
+                continue
             pc = pd.DataFrame(pca.transform(g_sub), index=index, columns=[colname_prefix+'_cluster'+str(int(label)+1)+'_PC'+str(i) for i in range(1,4)])
             if pca.explained_variance_ratio_[0] >= 0.6:
                 pc = pc.iloc[:,0].to_frame()
             else:
                 pc = pc.iloc[:,:2]
             window_res = pd.concat([window_res, pc], axis=1)
+            #variant = pd.Series(g.snp.values)[cluster.labels_ == label].to_frame()
+            #variant.loc[:,'cluster'] = colname_prefix+'_cluster'+str(int(label)+1)
+            #variant.columns = ['rs','cluster']
+            #cluster_variant = pd.concat([cluster_variant,variant])
+    #return window_res,cluster_variant
     return window_res
 
 def chr_cluster_pca(G_chr,chrom,window,step):
     chr_res = pd.DataFrame()
+    #chr_cluster_variant = pd.DataFrame()
     paras = []
     chr_end = G_chr.pos[-1]
     start = 0
@@ -117,7 +131,7 @@ def chr_cluster_pca(G_chr,chrom,window,step):
     if step == 0:
         step = window
     while start < chr_end:
-        G_chr_sub = G_chr.where((G_chr.pos>=start) & (G_chr.pos<=end),drop=True)
+        G_chr_sub = G_chr.where((G_chr.pos>=start) & (G_chr.pos<=end), drop=True)
         if G_chr_sub.shape[1] <= 100:
             start = start + step
             end = start + window
@@ -128,13 +142,16 @@ def chr_cluster_pca(G_chr,chrom,window,step):
             colname_prefix = '_'.join(['chr',chrom,str(start),str(end)])
 
         paras.append((G_chr_sub, G_chr_sub.sample, colname_prefix))
+        #cluster_pc,cluster_variant = cluster_PCA(G_chr_sub,G_chr_sub.sample,colname_prefix)
         cluster_pc = cluster_PCA(G_chr_sub,G_chr_sub.sample,colname_prefix)
         if chr_res.empty:
             chr_res = cluster_pc
         else:
             chr_res = pd.concat([chr_res, cluster_pc], axis=1)
+        #chr_cluster_variant = pd.concat([chr_cluster_variant,cluster_variant])
         start = start + step
         end = start + window
+    #return chr_res,chr_cluster_variant
     return chr_res
 
 
@@ -146,31 +163,33 @@ def genome_cluster(G, window, step, threads):
         G_chr = G.where(G.chrom == chrom,drop=True)
         paras.append((G_chr, chrom, window, step))
     res = mp.parallel(chr_cluster_pca, paras, threads)
-    res = pd.concat(res, axis=1)
-    return res
+    #res_pc = pd.concat([i[0] for i in res], axis=1)
+    res_pc = pd.concat(res, axis=1)
+    res_pc.loc[:,:] = np.around(MinMaxScaler(feature_range=(0, 2)).fit_transform(res_pc.values),decimals=3)
+    #res_variant = pd.concat([i[1] for i in res])
+    #return res_pc,res_variant
+    return res_pc
 
 
 def read_genotype(geno_prefix):
     try:
-        G = read_plink1_bin(geno_prefix + '.bed', geno_prefix + '.bim', geno_prefix + '.fam', verbose=False)
+        G = read_plink1_bin(geno_prefix + '.bed', geno_prefix + '.bim', geno_prefix + '.fam', ref='a0',verbose=False)
     except Exception:
         return None
     return G
 
-
 def snp_clumping(bed, r2, out):
     from rpy2.robjects.packages import importr
     from rpy2.robjects import pandas2ri
-    import rpy2.robjects as ro
-    from rpy2.robjects.conversion import localconverter
+    import rpy2.robjects as robjects
+    pandas2ri.activate()
+    robjects.r['options'](warn=-1)
     base = importr('base')
     bigsnpr = importr('bigsnpr')
     g = bigsnpr.snp_readBed(bed, backingfile=base.tempfile())
     g = bigsnpr.snp_attach(g)
-    with localconverter(ro.default_converter + pandas2ri.converter):
-        plink_map = ro.conversion.py2rpy(g[2])
-    snp_keep = bigsnpr.snp_clumping(g[0], infos_chr=plink_map.rx2('chromosome'), infos_pos=plink_map.rx2('physical.pos'),
-                                    thr_r2=r2)
+    snp_keep = bigsnpr.snp_clumping(g[0], infos_chr=g[2].rx2('chromosome'), infos_pos=g[2].rx2('physical.pos'),
+                                    thr_r2=r2, ncores=cpu_count() / 4)
     g_clump = bigsnpr.subset_bigSNP(g, ind_col=snp_keep)
     g_clump = bigsnpr.snp_attach(g_clump)
     bigsnpr.snp_writeBed(g_clump, out)

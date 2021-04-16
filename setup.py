@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 '''
 File name: setup.py
-Author: CrazyHsu @ crazyhsu9527@gmail.com 
+Author: CrazyHsu @ crazyhsu9527@gmail.com
 Created on: 2020-09-25 15:46:07
 Last modified: 2020-09-25 16:06:19
 '''
@@ -17,14 +17,16 @@ setup(name='MODAS',
     author='Songyu Liu',
     author_email='',
     license='GPLv3',
-    packages=["modas"],
+    packages=['modas'],
     scripts=['MODAS.py'],
     install_requires=[
+        'cython',
+        'yattag',
+        'pyranges',
         'pandas_plink',
         'numpy',
         'pandas',
+        'scipy',
         'scikit-learn',
-        'rpy2>=3.3.5',
-        'tzlocal'
     ]
 )

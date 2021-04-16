@@ -1,0 +1,150 @@
+#sidebar-test {
+  background: #1295a7;
+  width: 360px;
+  position: fixed;
+  top: 0;
+  height: 100vh;
+  z-index: 999;
+  color: #fff;
+  overflow-y: scroll;
+  left: 0px;
+}
+
+#sidebar-test, #sidebar-test * {
+  -webkit-transition: all 0.3s;
+  transition: all 0.3s;
+}
+
+.overlay {
+  position: fixed;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 998;
+  display: none;
+}
+
+#sidebar-test .sidebar-header {
+  padding: 15px;
+  background: rgba(0,0,0,.4);
+  min-height: 65px;
+  text-align: left;
+}
+
+.sidebar-header h1, .sidebar-header h2, .sidebar-header h3, .sidebar-header h4, .sidebar-header h5 {
+  margin: 0;
+}
+
+#sidebar-test > *:not(.sidebar-header):not(ul):not(.full-width) {
+  margin: 15px;
+}
+
+#sidebar-test > ul {
+  list-style: none;
+  padding: 0;
+}
+
+#sidebar-test h2 a.modas {
+    color: #fff;
+    text-decoration: none;
+}
+
+#sidebar-test ul li a {
+  padding: 10px 15px;
+  color: #fff;
+  display: block;
+  text-decoration: none;
+  /* background: rgba(0,0,0,.1); */
+  margin-bottom: 1px;
+}
+
+
+/* .listItem:hover {
+    background: rgba(0,0,0,.2);
+} */
+div.qtlItem {
+    display: flex;
+    background: rgba(0,0,0,.2);
+}
+div.qtlItem:hover {
+    background: rgba(0,0,0,.3);
+}
+div.qtlItem.active {
+    background: rgba(0,0,0,.3);
+}
+
+/* #sidebar-test ul li a:hover, #sidebar-test ul li.active > a, #sidebar-test a[aria-expanded="true"] {
+  background: rgba(0,0,0,.2);
+} */
+
+#sidebar-test ul li a.active {
+  background: rgba(0,0,0,.1);
+}
+
+#sidebar-test a[data-toggle="collapse"] {
+  position: absolute;
+  right: 0px;
+}
+
+#sidebar-test a[data-toggle="collapse"] > i.fa {
+  font-size: 12px;
+}
+/* #sidebar-test a[aria-expanded="false"]::before {
+  content: '\002B';
+  color: white;
+  font-weight: bold;
+  float: right;
+  margin-left: 5px;
+}
+
+#sidebar-test a[aria-expanded="true"]::after {
+  content: '\2212';
+  color: white;
+  font-weight: bold;
+  float: right;
+  margin-left: 5px;
+} */
+
+#sidebar-test ul ul a {
+  padding-left: 30px;
+  background: rgba(255,255,255,.1);
+}
+
+#sidebar-test ul ul a:hover {
+  background: rgba(255,255,255,.2);
+}
+
+#sidebar-test ul ul ul a {
+  padding-left: 60px;
+  background: rgba(255,255,255,.3);
+}
+
+#sidebar-test ul ul ul a:hover {
+  background: rgba(255,255,255,.4);
+}
+
+#sidebar-test .btn.btn-default {
+  background: rgba(0,0,0,.4);
+  border: none;
+  color: #fff;
+}
+
+#sidebar-test .btn.btn-default:hover {
+  background: rgba(0,0,0,.5);
+}
+
+#sidebar-test hr {
+  border-color: rgba(255,255,255,.3);
+}
+
+.content {
+  margin-left: 360px;
+}
+
+ul .nav {
+  display: list-item;
+}
+
+h1 {
+  margin-top: 100px;
+}

@@ -1,5 +1,5 @@
 # MODAS
-MODAS: Multi-omics data association study
+MODAS: Multi-Omics Data Association Study toolkit
 
 ## installation
 ```

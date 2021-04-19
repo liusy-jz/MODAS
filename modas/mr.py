@@ -13,7 +13,9 @@ import os
 
 
 def lm_res(y, X):
-    X = X.reshape(-1,1)
+    idx = np.isnan(X) | np.isnan(y)
+    X = X[~idx].reshape(-1, 1)
+    y = y[~idx]
     lm = LinearRegression().fit(X, y)
     sigma2 = np.sum((y - lm.predict(X))**2)/(X.shape[0]-1)
     se = np.sqrt(np.diag(np.linalg.pinv(np.dot(X.T, X))))[-1] * sigma2
@@ -132,7 +134,7 @@ def get_MLM_effect_parallell(assoc_dir, threads):
     for fn in glob.glob(assoc_dir.strip('/') + '/mTrait*.assoc.txt'):
         mTrait_name = fn.split('/')[-1].split('_')[-1].replace('.assoc.txt', '')
         assoc = pd.read_csv(fn, sep='\t')
-        assoc.index = mTrait_name+'-' + assoc['rs']
+        assoc.index = mTrait_name+';' + assoc['rs']
         mTrait_effect = pd.concat([mTrait_effect, assoc[['beta', 'se']]])
     for fn in glob.glob(assoc_dir.strip('/') + '/pTrait*assoc.txt'):
         pTrait_name.append(fn.split('/')[-1].split('_')[-1].replace('.assoc.txt', ''))
@@ -146,7 +148,7 @@ def get_MLM_effect_parallell(assoc_dir, threads):
 
 
 def MR_MLM(mTrait_effect_snp, pTrait_effect_snp, pTrait_se_snp, pvalue):
-    mTrait_name, rs = mTrait_effect_snp.name.split('-')
+    mTrait_name, rs = mTrait_effect_snp.name.split(';')
     bxy = pTrait_effect_snp / mTrait_effect_snp['beta']
     varbXY = var_bXY(mTrait_effect_snp['beta'], mTrait_effect_snp['se'], pTrait_effect_snp, pTrait_se_snp)
     TMR = bxy**2 / varbXY

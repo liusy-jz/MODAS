@@ -2,18 +2,42 @@
 MODAS: Multi-Omics Data Association Study toolkit
 
 ## installation
+### Installation using conda
 ```
+git clone https://github.com/liusy-jz/MODAS.git
+cd MODAS
 conda create -n modas python=3.7 -y
 conda activate modas
 python setup.py build
 python setup.py install
 
-pip install cffi    # if the version of cffi less than required version
 conda install -y -c conda-forge r-rcppeigen r=3.6 rpy2
-Rscript -e 'install.packages("data.table")'
-Rscript -e 'install.packages("ggplot2")'
-Rscript -e 'install.packages("ggsignif")'
-Rscript -e 'install.packages("bigsnpr",dependence=T)'
+Rscript -e 'install.packages(c("data.table", "ggplot2", "ggsignif"), repos="https://cloud.r-project.org")'
+Rscript -e 'install.packages("bigsnpr", dependence=T, repos="https://cloud.r-project.org")'
+
+MODAS_PATH=`pwd`
+vi ~/.bashrc
+export PATH="$MODAS_PATH/utils:$PATH"
+source ~/.bashrc
+```
+
+### Mannual Installation
+```
+#Depends: R(>=3.6), python(>=3.7)
+
+git clone https://github.com/liusy-jz/MODAS.git
+cd MODAS
+python setup.py build
+python setup.py install
+
+pip3 install rpy2
+Rscript -e 'install.packages(c("data.table", "ggplot2", "ggsignif"), repos="https://cloud.r-project.org")'
+Rscript -e 'install.packages("bigsnpr",dependence=T, repos="https://cloud.r-project.org")'
+
+MODAS_PATH=`pwd`
+vi ~/.bashrc
+export PATH="$MODAS_PATH/utils:$PATH"
+source ~/.bashrc
 ```
 
 ## A toy try

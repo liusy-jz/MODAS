@@ -16,7 +16,7 @@ import re
 pandas2ri.activate()
 data_table = importr('data.table')
 base = importr('base')
-
+robjects.r('options(datatable.showProgress = FALSE)')
 
 warnings.filterwarnings("ignore")
 
@@ -51,6 +51,7 @@ def gwas(phe, geno, num_threads, phe_fn):
 
 def gwas_plot(res, p, prefix, t):
     try:
+        base.sink('/dev/null')
         w = data_table.fread(res, data_table=base.getOption("datatable.fread.datatable", False))
         w_subset = w.loc[w.p_wald <= float(p), :]
         m = w_subset[['rs', 'chr', 'ps', 'p_wald']]
@@ -66,7 +67,7 @@ def gwas_plot(res, p, prefix, t):
         # q.names = ['SNP', 'Chromosome', 'Position', prefix]
         #thresholdi = robjects.FloatVector([1.0/w.nrow, 1e-6, 1e-5])
         #lim = -np.log10(min(np.array(w_subset.rx2('p_wald'))))+2
-        base.sink('/dev/null')
+        #base.sink('/dev/null')
         for path in os.environ.get('PATH').split(':'):
             if re.search(r'MODAS/utils',path):
                 robjects.r('source("'+path+'/CMplot.r")')

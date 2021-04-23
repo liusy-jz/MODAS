@@ -182,15 +182,19 @@ def snp_clumping(bed, r2, out):
     from rpy2.robjects.packages import importr
     from rpy2.robjects import pandas2ri
     import rpy2.robjects as robjects
+
     pandas2ri.activate()
     robjects.r['options'](warn=-1)
+    robjects.r('options(datatable.showProgress = FALSE)')
     base = importr('base')
+    base.sink('/dev/null')
     bigsnpr = importr('bigsnpr')
     g = bigsnpr.snp_readBed(bed, backingfile=base.tempfile())
     g = bigsnpr.snp_attach(g)
-    snp_keep = bigsnpr.snp_clumping(g[0], infos_chr=g[2].rx2('chromosome'), infos_pos=g[2].rx2('physical.pos'),
-                                    thr_r2=r2, ncores=cpu_count() / 4)
+    snp_keep = bigsnpr.snp_clumping(g[0], infos_chr=g[2]['chromosome'], infos_pos=g[2]['physical.pos'],
+                                    thr_r2=r2, ncores=1)
     g_clump = bigsnpr.subset_bigSNP(g, ind_col=snp_keep)
     g_clump = bigsnpr.snp_attach(g_clump)
     bigsnpr.snp_writeBed(g_clump, out)
-    return g[2].nrow, len(snp_keep)
+    base.sink()
+    return g[2].shape[0], len(snp_keep)

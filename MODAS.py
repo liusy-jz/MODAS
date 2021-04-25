@@ -171,9 +171,9 @@ def prescreen(args,log):
     if genome_cluster.empty:
         log.log('genome cluster file {} is empty and software is terminated.'.format(args.genome_cluster))
         sys.exit()
-    if os.path.exists('tmp_metabolite_bimbam'):
-        shutil.rmtree('tmp_metabolite_bimbam')
-    os.mkdir('tmp_metabolite_bimbam')
+    if os.path.exists('tmp_omics_phe_bimbam'):
+        shutil.rmtree('tmp_omics_phe_bimbam')
+    os.mkdir('tmp_omics_phe_bimbam')
     if os.path.exists('output'):
         os.rename('output','output'+datetime.datetime.now().strftime('%Y-%m-%d_%H:%M:%S'))
     fam = pd.read_csv(args.g+'.fam', sep=r'\s+', header=None,index_col=0)
@@ -182,15 +182,15 @@ def prescreen(args,log):
     phe = phe.reindex(sample_id)
     log.log('convert genome cluster file to bimbam genotype file.')
     a, g = ps.qtl_pc2bimbam(genome_cluster)
-    a.to_csv('tmp_metabolite_bimbam/'+args.g.split('/')[-1]+'_qtl_pc.anno.txt',index=False,header=None)
-    g.to_csv('tmp_metabolite_bimbam/'+args.g.split('/')[-1]+'_qtl_pc.geno.txt',index=False,header=None)
+    a.to_csv('tmp_omics_phe_bimbam/'+args.g.split('/')[-1]+'_qtl_pc.anno.txt',index=False,header=None)
+    g.to_csv('tmp_omics_phe_bimbam/'+args.g.split('/')[-1]+'_qtl_pc.geno.txt',index=False,header=None)
     if args.lm_suggest_pvalue is None:
         args.lm_suggest_pvalue = 1.0 / genome_cluster.shape[1]
     log.log('run lm model for genome cluster pseudo-SNP filter.')
-    s = ps.qtl_pc_lm_gwas_parallel(phe,'tmp_metabolite_bimbam',args.p,args.g)
+    s = ps.qtl_pc_lm_gwas_parallel(phe,'tmp_omics_phe_bimbam',args.p,args.g)
     ps.generate_omics_qtl_pc_bimbam(phe,a,g,args.lm_suggest_pvalue,args.p)
     log.log('run lmm model for Significant phenotype filter.')
-    s = ps.qtl_pc_lmm_gwas_parallel(phe,'tmp_metabolite_bimbam',args.p,args.g,sample_id)
+    s = ps.qtl_pc_lmm_gwas_parallel(phe,'tmp_omics_phe_bimbam',args.p,args.g,sample_id)
     sig_omics_phe, phe_sig_qtl = ps.prescreen(phe,args.lmm_suggest_pvalue)
     sig_omics_phe.to_csv(args.o+'.sig_omics_phe.csv')
     phe_sig_qtl.to_csv(args.o+'.phe_sig_qtl.csv',index=False)

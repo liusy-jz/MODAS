@@ -23,7 +23,7 @@ def qtl_pc_genotype_subset(g,a,rs,output_dir,phe):
 
 
 def generate_omics_qtl_pc_bimbam(omics_phe,a,g,lm_suggest_pvalue,threads):
-    prefix = 'tmp_metabolite_bimbam/'
+    prefix = 'tmp_omics_phe_bimbam/'
     #subset_genotype_args = list()
     g.index = g['index']
     a.index = g['index']

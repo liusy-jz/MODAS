@@ -17,7 +17,7 @@ Rscript -e 'install.packages("bigsnpr", dependence=T, repos="https://cloud.r-pro
 
 MODAS_PATH=`pwd`
 vi ~/.bashrc
-export PATH="$MODAS_PATH/utils:$PATH"
+export PATH=`echo $MODAS_PATH/utils`:$PATH
 source ~/.bashrc
 ```
 
@@ -36,7 +36,7 @@ Rscript -e 'install.packages("bigsnpr",dependence=T, repos="https://cloud.r-proj
 
 MODAS_PATH=`pwd`
 vi ~/.bashrc
-export PATH="$MODAS_PATH/utils:$PATH"
+export PATH=`echo $MODAS_PATH/utils`:$PATH
 source ~/.bashrc
 ```
 

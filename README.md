@@ -15,9 +15,7 @@ conda install -y -c conda-forge r-rcppeigen r=3.6 rpy2
 Rscript -e 'install.packages(c("data.table", "ggplot2", "ggsignif"), repos="https://cloud.r-project.org")'
 Rscript -e 'install.packages("bigsnpr", dependence=T, repos="https://cloud.r-project.org")'
 
-MODAS_PATH=`pwd`
-vi ~/.bashrc
-export PATH=`echo $MODAS_PATH/utils`:$PATH
+echo "export PATH=`pwd`/utils:\$PATH"|sed -i '$ r /dev/stdin' ~/.bashrc
 source ~/.bashrc
 ```
 
@@ -34,9 +32,7 @@ pip3 install rpy2
 Rscript -e 'install.packages(c("data.table", "ggplot2", "ggsignif"), repos="https://cloud.r-project.org")'
 Rscript -e 'install.packages("bigsnpr",dependence=T, repos="https://cloud.r-project.org")'
 
-MODAS_PATH=`pwd`
-vi ~/.bashrc
-export PATH=`echo $MODAS_PATH/utils`:$PATH
+echo "export PATH=`pwd`/utils:\$PATH"|sed -i '$ r /dev/stdin' ~/.bashrc
 source ~/.bashrc
 ```
 

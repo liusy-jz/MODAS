@@ -37,6 +37,6 @@ ENV CONDA_AUTO_UPDATE_CONDA=false
 RUN echo ". /root/conda/etc/profile.d/conda.sh" >> ~/.bashrc && \
     echo "conda activate modas" >> ~/.bashrc
 
-RUN git clone https://github.com/CrazyHsu/MODAS.git /root/MODAS && \
+RUN git clone https://github.com/liusy-jz/MODAS.git /root/MODAS && \
     cd /root/MODAS && \
     $CONDA_PREFIX/bin/python setup.py build && $CONDA_PREFIX/bin/python setup.py install

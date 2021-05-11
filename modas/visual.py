@@ -142,7 +142,7 @@ def boxplot(phe, g, qtl):
     phe = phe.reindex(ril)
     for index, row in qtl.iterrows():
         d = pd.concat([phe[row['phe_name']], g[row['SNP']]], axis=1)
-        d.columns = [d.columns[0].replace('-', '.'), 'haplotype']
+        d.columns = ['trait.' + d.columns[0].replace('-', '.'), 'haplotype']
         level = robjects.StrVector([allele[row['SNP']]['a1'].values*2, allele[row['SNP']]['a0'].values*2])
         box_plot(d, row['phe_name'], row['SNP'], level)
     base.sink()

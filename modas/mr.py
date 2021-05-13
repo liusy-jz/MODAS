@@ -165,7 +165,7 @@ def MR_MLM_parallel(mTrait_qtl, mTrait_effect, pTrait_effect, pTrait_se, threads
     for index, row in mTrait_qtl.iterrows():
         mTrait_name = row['phe_name']
         rs = row['SNP']
-        args.append((mTrait_effect.loc['-'.join([mTrait_name, rs]),:], pTrait_effect.loc[rs, :], pTrait_se.loc[rs, :], pvalue))
+        args.append((mTrait_effect.loc[';'.join([mTrait_name, rs]),:], pTrait_effect.loc[rs, :], pTrait_se.loc[rs, :], pvalue))
     res = mp.parallel(MR_MLM, args, threads)
     res = pd.concat([i for i in res])
     return res

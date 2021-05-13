@@ -43,5 +43,5 @@ MODAS.py prescreen -g ./chr_HAMP -genome_cluster ./chr_HAMP.genome_cluster.csv -
 MODAS.py regiongwas -g ./chr_HAMP -phe ./E3_log2.sig_omics_phe.csv -phe_sig_qtl ./E3_log2.phe_sig_qtl.csv -p 20 -o E3_log2
 ```
 
-##Document
+## Document
 detail in [https://modas-bio.github.io/](https://modas-bio.github.io/)

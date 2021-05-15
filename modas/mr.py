@@ -24,7 +24,7 @@ def lm_res(y, X):
     return pd.Series(dict(zip(['effect', 'se', 'rsq'], [effect, se, rsq])))
 
 
-def MR(mTrait, pTrait, g, pvalue):
+def MR(mTrait, pTrait, g, pvalue_cutoff):
     p = pd.concat([mTrait.to_frame(), pTrait], axis=1)
     snp_lm = p.apply(lm_res, args=[g.values])
     mTrait_lm = p.apply(lm_res, args=[mTrait.values])
@@ -36,16 +36,16 @@ def MR(mTrait, pTrait, g, pvalue):
     pvalue = 1 - chi2.cdf(TMR, 1)
     MR_res = pd.DataFrame(dict(zip(['snp', 'mTrait', 'pTrait', 'effect', 'TMR', 'pvalue'],
                         [[g.name]*pTrait.shape[1], [mTrait.name]*pTrait.shape[1], pTrait.columns, pTrait_mTrait, TMR, pvalue])))
-    MR_res = MR_res.loc[(MR_res.pvalue<=pvalue) & (MR_res.mTrait!=MR_res.pTrait),:]
+    MR_res = MR_res.loc[(MR_res.pvalue<=pvalue_cutoff) & (MR_res.mTrait!=MR_res.pTrait),:]
     return MR_res
 
 
-def MR_parallel(mTrait_qtl, mTrait, pTrait, geno, threads, pvalue):
+def MR_parallel(mTrait_qtl, mTrait, pTrait, geno, threads, pvalue_cutoff):
     args = list()
     for index, row in mTrait_qtl.iterrows():
         rs = row['SNP']
         mTrait_name = row['phe_name']
-        args.append((mTrait.loc[:, mTrait_name], pTrait, geno.loc[:, rs],pvalue))
+        args.append((mTrait.loc[:, mTrait_name], pTrait, geno.loc[:, rs], pvalue_cutoff))
     res = mp.parallel(MR, args, threads)
     res = pd.concat([i for i in res])
     return res
@@ -147,7 +147,7 @@ def get_MLM_effect_parallell(assoc_dir, threads):
     return mTrait_effect, pTrait_effect, pTrait_se
 
 
-def MR_MLM(mTrait_effect_snp, pTrait_effect_snp, pTrait_se_snp, pvalue):
+def MR_MLM(mTrait_effect_snp, pTrait_effect_snp, pTrait_se_snp, pvalue_cutoff):
     mTrait_name, rs = mTrait_effect_snp.name.split(';')
     bxy = pTrait_effect_snp / mTrait_effect_snp['beta']
     varbXY = var_bXY(mTrait_effect_snp['beta'], mTrait_effect_snp['se'], pTrait_effect_snp, pTrait_se_snp)
@@ -156,16 +156,16 @@ def MR_MLM(mTrait_effect_snp, pTrait_effect_snp, pTrait_se_snp, pvalue):
     MR_res = pd.DataFrame(dict(zip(['snp', 'mTrait', 'pTrait', 'effect', 'TMR', 'pvalue'],
                                    [[rs] * pTrait_effect_snp.shape[0], [mTrait_name] * pTrait_effect_snp.shape[0],
                                     pTrait_effect_snp.index, bxy, TMR, pvalue])))
-    MR_res = MR_res.loc[(MR_res.pvalue<=pvalue) & (MR_res.mTrait!=MR_res.pTrait), :]
+    MR_res = MR_res.loc[(MR_res.pvalue<=pvalue_cutoff) & (MR_res.mTrait!=MR_res.pTrait), :]
     return MR_res
 
 
-def MR_MLM_parallel(mTrait_qtl, mTrait_effect, pTrait_effect, pTrait_se, threads, pvalue):
+def MR_MLM_parallel(mTrait_qtl, mTrait_effect, pTrait_effect, pTrait_se, threads, pvalue_cutoff):
     args = []
     for index, row in mTrait_qtl.iterrows():
         mTrait_name = row['phe_name']
         rs = row['SNP']
-        args.append((mTrait_effect.loc[';'.join([mTrait_name, rs]),:], pTrait_effect.loc[rs, :], pTrait_se.loc[rs, :], pvalue))
+        args.append((mTrait_effect.loc[';'.join([mTrait_name, rs]),:], pTrait_effect.loc[rs, :], pTrait_se.loc[rs, :], pvalue_cutoff))
     res = mp.parallel(MR_MLM, args, threads)
     res = pd.concat([i for i in res])
     return res

@@ -304,7 +304,7 @@ def mr(args, log):
         cl1_path=''
         for path in os.environ.get('PATH').split(':'):
             if re.search(r'MODAS/utils',path):
-                cl1_path = path.strip('/')
+                cl1_path = path.rstrip('/')
         subprocess.call('java -jar '+ cl1_path +'/cluster_one-1.0.jar -f edge_list -F csv '+args.o+'.edgelist'+' >'+args.o+'.cluster_one.result.csv 2>/dev/null',shell=True)
         cluster_one_res = pd.read_csv(args.o+'.cluster_one.result.csv')
         cluster_one_res.loc[(cluster_one_res['P-value'] <= 0.05) & (cluster_one_res['Size'] >= 5), :].to_csv(args.o+'.sig.cluster_one.result.csv', index=False)

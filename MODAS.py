@@ -267,6 +267,10 @@ def mr(args, log):
         log.log('please select linear model or mixed linear model for Mendelian Randomization analysis')
         log.log('software is terminated.')
         sys.exit()
+    if not args.lm and not args.mlm:
+        log.log('please select a model from linear model and mixed linear model for Mendelian Randomization analysis')
+        log.log('software is terminated.')
+        sys.exit()
     if args.lm:
         log.log('perform Mendelian Randomization through linear model')
         g = gi.read_genotype(args.g)

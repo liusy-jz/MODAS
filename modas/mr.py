@@ -202,7 +202,7 @@ def edge_weight(qtl, MR_res):
         weight.append(coloc_count / mr_count[p])
     MR_res.loc[:, 'weight'] = weight
     edgeweight = MR_res[['mTrait', 'pTrait', 'weight']]
-    edgeweight = edgeweight.loc[edge_weight.weight >= 0.2, :]
+    edgeweight = edgeweight.loc[edgeweight.weight >= 0.2, :]
     edgeweight = edgeweight.sort_values(by=['mTrait', 'pTrait', 'weight'], ascending=False).drop_duplicates(subset=['mTrait', 'pTrait'])
     return edgeweight
 

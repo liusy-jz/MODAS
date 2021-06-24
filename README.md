@@ -41,7 +41,7 @@ source ~/.bashrc
 ```
 git clone https://github.com/liusy-jz/MODAS_data.git
 ```
-First check the integrity of the downloaded data, `MODAS_data` contains five folders, namely `agronomic_traits`, `genotype`, `metabolome`, `transcriptome` and `example_data`. The example folder contains sample data for MODAS, while other folders contain the omics data used in the article.<br/><br/>
+First check the integrity of the downloaded data, `MODAS_data` contains five folders, namely `agronomic_traits`, `genotype`, `metabolome`, `transcriptome` and `example_data`, also contains a gene annotaion file for maize. The example folder contains sample data for MODAS, while other folders contain the omics data used in the article.<br/><br/>
 Then, enter the `MODAS_data` directory,
 ```
 cd MODAS_data
@@ -69,7 +69,7 @@ MODAS.py regiongwas -g ./genotype/chr_HAMP -phe example.sig_omics_phe.csv -phe_s
 Regiongwas subcommand generates two QTL files including `example.region_gwas_qtl_res.csv` containing reliable QTL results and `example.region_gwas_bad_qtl_res.csv` containing unreliable QTL results.
 ### Perform Mendelian randomization analysis
 ```
-MODAS.py mr -g ./genotype/chr_HAMP -exposure ./example_data/test.exp.csv -outcome agronomic_traits/blup_traits_final.new.csv -qtl example_data/example_qtl_res.csv -mlm -o example
+MODAS.py mr -g ./genotype/chr_HAMP -exposure ./example_data/example.exp.csv -outcome agronomic_traits/blup_traits_final.new.csv -qtl example_data/example_qtl_res.csv -mlm -o example
 ```
 The results of Mendelian randomization analysis are saved as `example.MR.csv`.
 ### MR-based network analysis
@@ -78,7 +78,11 @@ MR-based network analysis is carried out by the parameter net of mr subcommand. 
 MODAS.py mr -g ./chr_HAMP/genotype -exposure ./example_data/network_example.exp.csv -outcome ./example_data/network_example.exp.csv -qtl example_data/network_example_qtl.csv -mlm -net -o network_example
 ```
 Network analysis generated four files, including `network_example.MR.csv` containing gene pairs with MR effect, `network_example.edgelist` containing gene pairs with weight, `network_example.cluster_one.result.csv` containing all identified subnetwork modules, `network_example.sig.cluster_one.result.csv` containing significant subnetwork modules.
-
-
+### co-associated gene analysis
+Co-associated genes analysis is not a modas function. It is implemented by script `co-associated.py`. The analysis command line is as follows:
+```
+python3 co-associated.py example_data/co_associated.test.pvalue.csv co-associated_test
+```
+Then, a file containing co-associated gene labels and a heatmap showing relationship between co-associated genes are saved as `co-associated_test.cluster.csv` and `co-associated_test.cluster.heatmap.pdf`.
 ## Document
 detail in [https://modas-bio.github.io/](https://modas-bio.github.io/)

@@ -127,23 +127,31 @@ def get_MLM_effect(fn):
     return assoc[['beta', 'se']]
 
 
-def get_MLM_effect_parallell(assoc_dir, threads):
+def get_MLM_effect_parallell(assoc_dir, mTrait, pTrait, threads):
     mTrait_effect = pd.DataFrame()
     args = []
-    pTrait_name = []
-    for fn in glob.glob(assoc_dir.strip('/') + '/mTrait*.assoc.txt'):
-        mTrait_name = fn.split('/')[-1].split('_')[-1].replace('.assoc.txt', '')
+    #pTrait_name = []
+    # for fn in glob.glob(assoc_dir.strip('/') + '/mTrait*.assoc.txt'):
+    #     mTrait_name = fn.split('/')[-1].split('_')[-1].replace('.assoc.txt', '')
+    #     assoc = pd.read_csv(fn, sep='\t')
+    #     assoc.index = mTrait_name+';' + assoc['rs']
+    #     mTrait_effect = pd.concat([mTrait_effect, assoc[['beta', 'se']]])
+    # for fn in glob.glob(assoc_dir.strip('/') + '/pTrait*assoc.txt'):
+    #     pTrait_name.append(fn.split('/')[-1].split('_')[-1].replace('.assoc.txt', ''))
+    #     args.append((fn,))
+    for mTrait_name in mTrait.columns:
+        fn = assoc_dir.strip('/') + '/mTrait_' + mTrait_name + '.assoc.txt'
         assoc = pd.read_csv(fn, sep='\t')
         assoc.index = mTrait_name+';' + assoc['rs']
         mTrait_effect = pd.concat([mTrait_effect, assoc[['beta', 'se']]])
-    for fn in glob.glob(assoc_dir.strip('/') + '/pTrait*assoc.txt'):
-        pTrait_name.append(fn.split('/')[-1].split('_')[-1].replace('.assoc.txt', ''))
+    for pTrait_name in pTrait.columns:
+        fn = assoc_dir.strip('/') + '/pTrait_' + pTrait_name + '.assoc.txt'
         args.append((fn,))
     pTrait_res = mp.parallel(get_MLM_effect, args, threads)
     pTrait_effect = pd.concat([i['beta'] for i in pTrait_res], axis=1)
-    pTrait_effect.columns = pTrait_name
+    pTrait_effect.columns = pTrait.columns
     pTrait_se = pd.concat([i['se'] for i in pTrait_res], axis=1)
-    pTrait_se.columns = pTrait_name
+    pTrait_se.columns = pTrait.columns
     return mTrait_effect, pTrait_effect, pTrait_se
 
 

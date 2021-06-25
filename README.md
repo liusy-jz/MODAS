@@ -38,10 +38,15 @@ source ~/.bashrc
 
 ## A toy try
 ### Downloading example data
+MODAS_data containing sample data for MODAS and omics data used in the article uploaded by Git extension Git Large File Storage (LFS), first download Git LFS from [https://git-lfs.github.com/](https://git-lfs.github.com/),  and place the `git-lfs` binary on your system’s executable `$PATH` or equivalent, then set up Git LFS for your user account by running:
+```
+git lfs install
+```
+then download `MODAS_data` by running:
 ```
 git clone https://github.com/liusy-jz/MODAS_data.git
 ```
-First check the integrity of the downloaded data, `MODAS_data` contains five folders, namely `agronomic_traits`, `genotype`, `metabolome`, `transcriptome` and `example_data`, also contains a gene annotaion file for maize. The example folder contains sample data for MODAS, while other folders contain the omics data used in the article.<br/><br/>
+When the download is complete, first check the integrity of the downloaded data, `MODAS_data` contains five folders, namely `agronomic_traits`, `genotype`, `metabolome`, `transcriptome` and `example_data`, also contains a gene annotaion file for maize. The example folder contains sample data for MODAS, while other folders contain the omics data used in the article.<br/><br/>
 Then, enter the `MODAS_data` directory,
 ```
 cd MODAS_data

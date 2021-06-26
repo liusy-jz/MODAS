@@ -11,6 +11,7 @@ conda activate modas
 python setup.py build
 python setup.py install
 
+pip install pyranges
 conda install -y -c conda-forge r-rcppeigen r=3.6 rpy2
 Rscript -e 'install.packages(c("data.table", "ggplot2", "ggsignif", "Matrix"), repos="https://cloud.r-project.org")'
 Rscript -e 'install.packages("bigsnpr", dependence=T, repos="https://cloud.r-project.org")'
@@ -28,7 +29,7 @@ cd MODAS
 python setup.py build
 python setup.py install
 
-pip3 install rpy2
+pip3 install rpy2 pyranges
 Rscript -e 'install.packages(c("data.table", "ggplot2", "ggsignif", "Matrix"), repos="https://cloud.r-project.org")'
 Rscript -e 'install.packages("bigsnpr",dependence=T, repos="https://cloud.r-project.org")'
 

@@ -22,7 +22,6 @@ setup(name='MODAS',
     install_requires=[
         'cython',
         'yattag',
-        'pyranges',
         'pandas_plink',
         'numpy',
         'matplotlib',

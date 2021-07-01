@@ -1,7 +1,7 @@
 # MODAS
 MODAS: Multi-Omics Data Association Study toolkit
 
-## installation
+## Installation
 ### Installation using conda
 ```
 git clone https://github.com/liusy-jz/MODAS.git

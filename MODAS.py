@@ -107,7 +107,7 @@ def phenorm(args,log):
         log.log('the phenotype file {} is empty and software is terminated.'.format(args.phe))
         sys.exit()
     if args.v is None and args.r is None and not args.log2 and not args.log10 and not args.ln and not args.norm and not args.qqnorm:
-        log.log('No phenotype filter process or normalize process choosed, please select one of the argument in -a, -r, -log2, -log10, -ln, -norm, -qqnorm.')
+        log.log('No phenotype filter process or normalize process choosed, please select one of the argument in -v, -r, -log2, -log10, -ln, -norm, -qqnorm.')
         sys.exit()
     log.log('Read phenotype file finished,There are {} phenotypes in phenotype file.'.format(phe.shape[1]))
     if args.r is not None:

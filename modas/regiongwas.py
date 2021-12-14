@@ -1,43 +1,110 @@
 import pandas as pd
 import numpy as np
 import modas.multiprocess as mp
+import modas.gwas_cmd as gc
 from sklearn.decomposition import PCA
+from rpy2.robjects import pandas2ri
+from rpy2.rinterface_lib.embedded import RRuntimeError
+import rpy2.robjects as robjects
+from rpy2.robjects.packages import importr
+from rpy2.rinterface_lib.callbacks import logger as rpy2_logger
+import logging
 import glob, os
 import shutil
 import re
 
+pandas2ri.activate()
+rpy2_logger.setLevel(logging.ERROR)
+rMVP = importr('rMVP')
+base = importr('base')
+bigmemory = importr('bigmemory')
 
-def region_gwas_parallel(bed_dir, threads,geno):
-    local_gwas_args = list()
+
+def region_gwas_parallel(bed_dir, threads, geno, gwas_model):
+    region_gwas_args = list()
     geno_prefix = geno.split('/')[-1]
-    fam = pd.read_csv(geno+'.fam', sep=r'\s+', header=None)
-    fam[5] = 1
-    fam.to_csv(geno_prefix+'.link.fam', sep='\t', na_rep='NA', header=None, index=False)
-    if os.path.exists(geno_prefix+'.link.bed'):
-        os.remove(geno_prefix+'.link.bed')
-    if os.path.exists(geno_prefix+'.link.bim'):
-        os.remove(geno_prefix+'.link.bim')
-    os.symlink(geno+'.bed', geno_prefix+'.link.bed')
-    os.symlink(geno+'.bim', geno_prefix+'.link.bim')
-    related_matrix_cmd = 'gemma.linux -bfile {0}.link -gk 1 -o {1}'.format(geno_prefix,geno_prefix)
-    s = mp.run(related_matrix_cmd)
-    if s!=0:
-        return None
-    gemma_cmd = 'gemma.linux -bfile {0} -k ./output/{1}.cXX.txt -lmm -n 1 -o {2}'
-    for i in glob.glob(bed_dir+'/*.bed'):
+    if gwas_model == 'GLM' or gwas_model == 'MLM':
+        fam = pd.read_csv(geno+'.fam', sep=r'\s+', header=None)
+        fam[5] = 1
+        fam.to_csv(geno_prefix+'.link.fam', sep='\t', na_rep='NA', header=None, index=False)
+        if os.path.exists(geno_prefix+'.link.bed'):
+            os.remove(geno_prefix+'.link.bed')
+        if os.path.exists(geno_prefix+'.link.bim'):
+            os.remove(geno_prefix+'.link.bim')
+        os.symlink(geno+'.bed', geno_prefix+'.link.bed')
+        os.symlink(geno+'.bim', geno_prefix+'.link.bim')
+        if gwas_model=='MLM':
+            related_matrix_cmd = 'gemma.linux -bfile {0}.link -gk 1 -o {1}'.format(geno_prefix,geno_prefix)
+            s = mp.run(related_matrix_cmd)
+            if s!=0:
+                return None
+    # if gwas_model=='MLM':
+    #     gemma_cmd = 'gemma.linux -bfile {0} -k ./output/{1}.cXX.txt -lmm -n 1 -o {2}'
+    # elif gwas_model=='LM':
+    #     gemma_cmd = 'gemma.linux -bfile {0} -lm  -o {1}'
+
+
+    for _, i in enumerate(glob.glob(bed_dir+'/*.bed')):
         i = i.replace('.bed','')
         i = i.replace('m/z','m.z')
         prefix = i.split('/')[-1]
-        local_gwas_args.append((gemma_cmd.format(i,geno_prefix,prefix+'_plink'),))
-    s = mp.parallel(mp.run, local_gwas_args, threads)
-    os.remove(geno_prefix+'.link.bed')
-    os.remove(geno_prefix+'.link.bim')
-    os.remove(geno_prefix+'.link.fam')
+        if gwas_model == 'MLM':
+            region_gwas_args.append((gc.gemma_cmd('MLM', i, geno_prefix, 1, prefix + '_plink'),))
+            # region_gwas_args.append((gemma_cmd.format(i, geno_prefix, prefix+'_plink'),))
+        elif gwas_model == 'LM':
+            region_gwas_args.append((gc.gemma_cmd('LM', i, None, None, prefix + '_plink'),))
+            # region_gwas_args.append((gemma_cmd.format(i, prefix+'_plink'),))
+        else:
+            phe = pd.read_csv(i+'.fam', sep='\s+',header=None)
+            phe = phe.iloc[:, [0, -1]]
+            phe.columns = ['Taxa', prefix]
+            # region_gwas_args.append((phe, '../'+geno_prefix + '.link', '../'+i, 1))
+            region_gwas_args.append(('GLM', geno_prefix+'.link', i, phe, 1, './output'))
+    if gwas_model == 'LM' or gwas_model == 'MLM':
+        s = mp.parallel(mp.run, region_gwas_args, threads)
+    else:
+        if not os.path.exists('./output'):
+            os.mkdir('./output')
+        # os.chdir('./output')
+        # s = mp.parallel(glm_gwas, (region_gwas_args[0],), 1)
+        # s = mp.parallel(glm_gwas, region_gwas_args[1:], threads)
+        # os.chdir('../')
+        s = mp.parallel(gc.rmvp, (region_gwas_args[0],), 1)
+        s = mp.parallel(gc.rmvp, region_gwas_args[1:], threads)
+    if gwas_model == 'GLM' or gwas_model == 'MLM':
+        os.remove(geno_prefix+'.link.bed')
+        os.remove(geno_prefix+'.link.bim')
+        os.remove(geno_prefix+'.link.fam')
     return s
+
+
+def glm_gwas(omics_phe, pc_geno_prefix, geno_prefix, threads):
+    try:
+        base.sink('/dev/null')
+        if not os.path.exists(pc_geno_prefix + '.pc.desc'):
+            rMVP.MVP_Data(fileBed=pc_geno_prefix, fileKin=False, filePC=False, out=pc_geno_prefix,
+                          verbose=False)
+            rMVP.MVP_Data_PC(True, mvp_prefix=pc_geno_prefix, pcs_keep=3, verbose=False)
+        rMVP.MVP_Data(fileBed=geno_prefix, fileKin=False, filePC=False, out=geno_prefix, verbose=False)
+        geno = bigmemory.attach_big_matrix(geno_prefix +'.geno.desc')
+        map_file = pd.read_csv(geno_prefix +'.geno.map', sep='\t')
+        Covariates_PC = bigmemory.as_matrix(bigmemory.attach_big_matrix(pc_geno_prefix + '.pc.desc'))
+        # base.setwd('./output')
+        rMVP.MVP(phe=omics_phe, geno=geno, map=map_file, CV_GLM=Covariates_PC, priority="speed",
+                ncpus=threads, maxLoop=10, threshold=0.05, method=['GLM'], file_output=True, verbose=False)
+        base.sink()
+        #gwas(omics_phe, pc_geno_prefix, geno_prefix, threads)
+    except RRuntimeError:
+        return 0
+    except ValueError:
+        return 0
+    else:
+        return 1
+
 
 def generate_qtl_batch(omics_phe,phe_sig_qtl,geno_name,threads,bed_dir,rs_dir):
     plink_extract = 'plink -bfile {} --extract {} --make-bed -out {}'
-    bim = pd.read_csv(geno_name+'.bim',sep='\t',header=None)
+    bim = pd.read_csv(geno_name+'.bim', sep='\t', header=None)
     qtl_batch = list()
     rs = dict()
     for index,row in phe_sig_qtl.iterrows():
@@ -70,16 +137,24 @@ def generate_qtl_batch(omics_phe,phe_sig_qtl,geno_name,threads,bed_dir,rs_dir):
 #     if sum(s) != 0:
 #         print(','.join(list(np.array(fns)[s]))+' do not  successfully generated clump input file.')
 #     return s
-def generate_clump_input(dir,num_threads):
+def generate_clump_input(dir, gwas_model):
     if os.path.exists('./clump_input'):
         shutil.rmtree('./clump_input')
     os.mkdir('./clump_input')
-    for fn in glob.glob(dir.strip('/')+'/*_plink.assoc.txt'):
-        filename = fn.split('/')[-1]
-        assoc = pd.read_csv(fn, sep='\t')
-        assoc = assoc[['rs', 'p_wald']]
-        assoc.columns = ['SNP', 'P']
-        assoc.to_csv('./clump_input/' + filename.replace('_plink.assoc.txt', '.assoc'), index=False, sep='\t')
+    if gwas_model == 'LM' or gwas_model == 'MLM':
+        for fn in glob.glob(dir.strip('/')+'/*_plink.assoc.txt'):
+            filename = fn.split('/')[-1]
+            assoc = pd.read_csv(fn, sep='\t')
+            assoc = assoc[['rs', 'p_wald']]
+            assoc.columns = ['SNP', 'P']
+            assoc.to_csv('./clump_input/' + filename.replace('_plink.assoc.txt', '.assoc'), index=False, sep='\t')
+    else:
+        for fn in glob.glob(dir.strip('/')+'/tmp_*GLM.csv'):
+            filename = fn.split('/')[-1]
+            assoc = pd.read_csv(fn)
+            assoc = assoc.iloc[:, [0, -1]]
+            assoc.columns = ['SNP', 'P']
+            assoc.to_csv('./clump_input/' + filename.replace('.GLM.csv', '.assoc'), index=False, sep='\t')
 
 
 def plink_clump(geno_path, p1, p2, num_threads):
@@ -143,6 +218,7 @@ def merge_qtl_phe(qtl):
     merged_phe_qtl = pd.DataFrame(merged_phe_qtl)
     return merged_phe_qtl
 
+
 def merge_qtl(qtl):
     qtl = qtl.sort_values(by=['CHR','qtl_start'])
     merged_qtl = pd.DataFrame()
@@ -170,6 +246,7 @@ def merge_qtl(qtl):
             else:
                 merged_qtl = pd.concat([merged_qtl, row.to_frame().T])
     return merged_qtl
+
 
 def phe_cluster(phe, phe_labeled, n):
     pca = PCA(n_components=1)
@@ -208,7 +285,7 @@ def phe_cluster(phe, phe_labeled, n):
 
 
 
-def generate_qtl(clump_result_dir):
+def generate_qtl(clump_result_dir, p2):
     qtl_res = list()
     bad_qtl = list()
     for fn in glob.glob(clump_result_dir.strip('/')+'/*clumped'):
@@ -226,7 +303,7 @@ def generate_qtl(clump_result_dir):
             mer_qtl_filter = merge_qtl_phe(qtl_filter)
             mer_qtl_filter.loc[:,'qtl_length'] = mer_qtl_filter['qtl_end'] - mer_qtl_filter['qtl_start'] + 1
             if mer_qtl_filter.shape[0] < 10:
-                qtl = qtl.loc[(qtl.SP2_num>=5) & (qtl.log10P >= (qtl.loc[qtl['SP2_num'].idxmax(), 'log10P' ]-6) / 2 + 6),['CHR','qtl_start','qtl_end','SNP','P','SP2_num','phe_name']]
+                qtl = qtl.loc[(qtl.SP2_num>=5) & (qtl.log10P >= -np.log10(p2)), ['CHR','qtl_start','qtl_end','SNP','P','SP2_num','phe_name']]
                 mer_qtl = merge_qtl_phe(qtl)
                 mer_qtl.loc[:,'qtl_length'] = mer_qtl['qtl_end'] - mer_qtl['qtl_start'] + 1
                 mer_qtl = mer_qtl.loc[:,['CHR','qtl_start','qtl_end','SNP','P','SP2_num','qtl_length','phe_name']]
@@ -243,6 +320,7 @@ def generate_qtl(clump_result_dir):
     else:
         bad_qtl = pd.concat(bad_qtl)
     return qtl_res, bad_qtl
+
 
 def phe_PCA(omics_phe, qtl):
     omics_phe = omics_phe.fillna(omics_phe.mean())
@@ -270,4 +348,4 @@ def phe_PCA(omics_phe, qtl):
         omics_phe_sub_pc,omics_sig_phe_labeled,n = phe_cluster(omics_phe_sub, omics_sig_phe_labeled, n)
         omics_phe_pc = pd.concat([omics_phe_pc, omics_phe_sub_pc],axis=1)
     clustered_omics_phe = pd.merge(omics_phe_pc.loc[:,~omics_phe_pc.columns.isin(omics_sig_phe.columns)],omics_sig_phe_labeled.loc[omics_sig_phe_labeled.label==0,:].drop('label',axis=1).T,left_index=True,right_index=True)
-    return clustered_omics_phe,omics_sig_phe_labeled
+    return clustered_omics_phe, omics_sig_phe_labeled

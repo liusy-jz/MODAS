@@ -3,8 +3,7 @@ from sklearn.cluster import DBSCAN
 from sklearn.decomposition import PCA
 from multiprocessing import cpu_count
 from sklearn.preprocessing import MinMaxScaler
-#from rpy2.robjects.packages import importr
-#from rpy2.robjects import pandas2ri
+from sklearn.metrics import pairwise_distances
 import warnings
 import modas.multiprocess as mp
 import numpy as np
@@ -12,9 +11,6 @@ import pandas as pd
 from collections import Counter
 import struct
 
-#pandas2ri.activate()
-#base = importr('base')
-#bigsnpr = importr('bigsnpr')
 warnings.filterwarnings("ignore")
 
 
@@ -85,13 +81,34 @@ def hap2plink_bed(hap, plink):
     else:
         return True
 
+
+#def jaccard_tri_new(u, v):
+#    a = (u == v).sum() - np.bitwise_and(u == 0, v == 0).sum()
+#    b = np.logical_or(u, v).sum()
+#    return 1 - a / b if b != 0 else 0
+
+
+def jaccard_tri(u, v):
+    u = u.astype(int)
+    v = v.astype(int)
+    a = np.logical_and(u, v)
+    minor_het_u = (np.bitwise_and(u, v)).astype(bool).sum()
+    minor_het_i = (np.bitwise_or(u, v)).astype(bool).sum() + a.sum() - minor_het_u
+    return 1 - np.double(minor_het_u)/minor_het_i if minor_het_i !=0 else 0
+
+
+
 def optimal_cluster(g):
-        cluster = DBSCAN(eps=0.2, min_samples=10, metric='jaccard').fit(g.T)
-        if sum(cluster.labels_ == -1) < g.shape[1]*0.3:
-            return cluster
-        else:
-            cluster = DBSCAN(eps=0.35, min_samples=5, metric='jaccard').fit(g.T)
-            return cluster
+    dis = pairwise_distances(g.T, metric=jaccard_tri, n_jobs=-1)
+    cluster = DBSCAN(eps=0.2, min_samples=10, metric='precomputed').fit(dis)
+    if sum(cluster.labels_ == -1) < g.shape[1]*0.3:
+        return cluster
+    else:
+        # cluster = DBSCAN(eps=0.35, min_samples=5, metric='jaccard').fit(dis)
+        #cluster = DBSCAN(eps=0.35, min_samples=5, metric=jaccard_tri_new).fit(g.T)
+        # cluster = DBSCAN(eps=0.35, min_samples=5, metric='jaccard').fit(g.T)
+        cluster = DBSCAN(eps=0.35, min_samples=5, metric='precomputed').fit(dis)
+        return cluster
 
 
 def cluster_PCA(g,index,colname_prefix):

@@ -107,7 +107,7 @@ def phenorm(args,log):
         log.log('the phenotype file {} is empty and software is terminated.'.format(args.phe))
         sys.exit()
     if args.v is None and args.r is None and not args.log2 and not args.log10 and not args.ln and not args.norm and not args.qqnorm:
-        log.log('No phenotype filter process or normalize process choosed, please select one of the argument in -v, -r, -log2, -log10, -ln, -norm, -qqnorm.')
+        log.log('No phenotype filter process or normalize process choosed, please select one of the argument in -a, -r, -log2, -log10, -ln, -norm, -qqnorm.')
         sys.exit()
     log.log('Read phenotype file finished,There are {} phenotypes in phenotype file.'.format(phe.shape[1]))
     if args.r is not None:
@@ -165,8 +165,13 @@ def prescreen(args,log):
     log.log('Read phenotype file finished,There are {} phenotypes in phenotype file.'.format(phe.shape[1]))
     if not os.path.exists(args.genome_cluster):
         raise ArgsError('genome cluster file is not exists, can not run phenotype prescreen analysis,please assign a exist file for -genome_cluster.')
-    if not os.path.exists(args.g+'.bed'):
-        raise ArgsError('the plink bed format genotype file {} is not exists.'.format(args.g))
+    if args.gwas_model == 'MLM':
+        if args.g is None:
+            log.log('the plink bed format genotype  not provided, Using LM(linear model) for pseudo-genotype file GWAS analysis.')
+            args.gwas_model = 'LM'
+        elif not os.path.exists(args.g+'.bed'):
+            log.log('the plink bed format genotype file {}.bed is not exists. Using LM(linear model) for pseudo-genotype file GWAS analysis'.format(args.g))
+            args.gwas_model = 'LM'
     genome_cluster = pd.read_csv(args.genome_cluster, index_col=0)
     if genome_cluster.empty:
         log.log('genome cluster file {} is empty and software is terminated.'.format(args.genome_cluster))
@@ -176,24 +181,37 @@ def prescreen(args,log):
     os.mkdir('tmp_omics_phe_bimbam')
     if os.path.exists('output'):
         os.rename('output','output'+datetime.datetime.now().strftime('%Y-%m-%d_%H:%M:%S'))
-    fam = pd.read_csv(args.g+'.fam', sep=r'\s+', header=None,index_col=0)
-    sample_id = fam.index.intersection(genome_cluster.index)
-    genome_cluster = genome_cluster.reindex(sample_id)
-    phe = phe.reindex(sample_id)
+    #if args.gwas_model =='MLM':
+    #    fam = pd.read_csv(args.g+'.fam', sep=r'\s+', header=None,index_col=0)
+    #    sample_id = fam.index.intersection(genome_cluster.index)
+    #    genome_cluster = genome_cluster.reindex(sample_id)
+    #    geno_prefix = args.g.split('/')[-1]
+    #else:
+    #    sample_id = genome_cluster.index
+    #    geno_prefix = '.'.join(args.genome_cluster.split('/')[-1].split('.')[:-2])
+    #phe = phe.reindex(sample_id)
+    phe = phe.reindex(genome_cluster.index)
+    geno_prefix = '.'.join(args.genome_cluster.split('/')[-1].split('.')[:-2])
     log.log('convert genome cluster file to bimbam genotype file.')
     a, g = ps.qtl_pc2bimbam(genome_cluster)
-    a.to_csv('tmp_omics_phe_bimbam/'+args.g.split('/')[-1]+'_qtl_pc.anno.txt',index=False,header=None)
-    g.to_csv('tmp_omics_phe_bimbam/'+args.g.split('/')[-1]+'_qtl_pc.geno.txt',index=False,header=None)
-    if args.lm_suggest_pvalue is None:
-        args.lm_suggest_pvalue = 1.0 / genome_cluster.shape[1]
-    log.log('run lm model for genome cluster pseudo-SNP filter.')
-    s = ps.qtl_pc_lm_gwas_parallel(phe,'tmp_omics_phe_bimbam',args.p,args.g)
-    ps.generate_omics_qtl_pc_bimbam(phe,a,g,args.lm_suggest_pvalue,args.p)
-    log.log('run lmm model for Significant phenotype filter.')
-    s = ps.qtl_pc_lmm_gwas_parallel(phe,'tmp_omics_phe_bimbam',args.p,args.g,sample_id)
-    sig_omics_phe, phe_sig_qtl = ps.prescreen(phe,args.lmm_suggest_pvalue)
-    sig_omics_phe.to_csv(args.o+'.sig_omics_phe.csv')
-    phe_sig_qtl.to_csv(args.o+'.phe_sig_qtl.csv',index=False)
+    a.to_csv('tmp_omics_phe_bimbam/'+geno_prefix+'_qtl_pc.anno.txt',index=False,header=None)
+    g.to_csv('tmp_omics_phe_bimbam/'+geno_prefix+'_qtl_pc.geno.txt',index=False,header=None)
+    if args.gwas_suggest_pvalue is None:
+        args.gwas_suggest_pvalue = 1.0 / genome_cluster.shape[1]
+    log.log('running pseudo-genotype GWAS for significant phenotype filter.')
+    s = ps.qtl_pc_gwas_parallel(phe, 'tmp_omics_phe_bimbam', args.p, args.g, geno_prefix, args.gwas_model)
+    # if args.lm_suggest_pvalue<1:
+    #     log.log('run lm model for genome cluster pseudo-SNP filter.')
+    #     s = ps.qtl_pc_lm_gwas_parallel(phe,'tmp_omics_phe_bimbam',args.p,args.g)
+    #     ps.generate_omics_qtl_pc_bimbam(phe,a,g,args.lm_suggest_pvalue,args.p)
+    #     log.log('run lmm model for Significant phenotype filter.')
+    #     s = ps.qtl_pc_lmm_gwas_parallel(phe,'tmp_omics_phe_bimbam',args.p,args.g,sample_id)
+    # else:
+    #     log.log('run lmm model for Significant phenotype filter.')
+    #     s = ps.qtl_pc_lmm_gwas_parallel(phe, 'tmp_omics_phe_bimbam', args.p, args.g, sample_id, args.lm_suggest_pvalue)
+    sig_omics_phe, phe_sig_qtl = ps.prescreen(phe, args.gwas_suggest_pvalue)
+    sig_omics_phe.to_csv(args.o+'.sig_omics_phe.csv', na_rep='NA')
+    phe_sig_qtl.to_csv(args.o+'.phe_sig_qtl.csv', index=False)
     log.log('prescreened phenotype saved successfully')
 
 
@@ -223,11 +241,16 @@ def regiongwas(args,log):
     log.log('begin generate phenotype significant gwas region SNP genotype file...')
     rg.generate_qtl_batch(phe,phe_sig_qtl,args.g,args.p,'tmp_qtl_bed','tmp_rs_dir')
     log.log('begin region gwas analysis of phenotype significant gwas region...')
-    s = rg.region_gwas_parallel('tmp_qtl_bed', args.p,args.g)
+    s = rg.region_gwas_parallel('tmp_qtl_bed', args.p,args.g,args.gwas_model)
     log.log('begin generate QTL of phenotypes...')
-    s = rg.generate_clump_input('output',args.p)
+    s = rg.generate_clump_input('output', args.gwas_model)
+    if args.p1 is None:
+        bim = pd.read_csv(args.g+'.bim', header=None, sep='\s+')
+        args.p1 = 1.0 / bim.shape[0]
+    if args.p2 is None:
+        args.p2 = args.p1 * 10
     s = rg.plink_clump('tmp_qtl_bed', args.p1, args.p2, args.p)
-    qtl_res, bad_qtl = rg.generate_qtl('clump_result')
+    qtl_res, bad_qtl = rg.generate_qtl('clump_result', args.p2)
     qtl_res.index = np.arange(qtl_res.shape[0])
     qtl_res.to_csv(args.o+'.region_gwas_qtl_res.csv', index=False)
     bad_qtl.to_csv(args.o+'.region_gwas_bad_qtl_res.csv', index=False)
@@ -289,7 +312,7 @@ def mr(args, log):
         log.log('perform Mendelian Randomization through mixed linear model')
         MR.generate_geno_batch(qtl, mTrait, pTrait, args.g, args.p, 'tmp_mr_bed', 'tmp_mr_rs')
         MR.calc_MLM_effect('tmp_mr_bed', pTrait, args.p, args.g)
-        mTrait_effect, pTrait_effect, pTrait_se = MR.get_MLM_effect_parallell('./output', mTrait, pTrait, args.p)
+        mTrait_effect, pTrait_effect, pTrait_se = MR.get_MLM_effect_parallell('./output', args.p)
         res = MR.MR_MLM_parallel(qtl, mTrait_effect, pTrait_effect, pTrait_se, args.p, args.pvalue)
         res.to_csv(args.o+'.MR.csv', index=False)
         log.log('Successfully perform Mendelian randomization analysis using mixed linear model')
@@ -326,21 +349,24 @@ def visual(args, log):
         log.log('the phenotype QTL file {} is empty and software is terminated.'.format(args.qtl))
         sys.exit()
     phe = phe.loc[:, phe.columns.isin(qtl.phe_name)]
-    if not os.path.exists(args.g+'.bed'):
+    if not os.path.exists(args.g + '.bed'):
         raise ArgsError('the plink bed format genotype file {} is not exists.'.format(args.g))
     g = gi.read_genotype(args.g)
     if g is None:
         raise FileTypeError('{0}.bed is not a plink bed format file or {0}.bim file and {0}.fam file is not in the same folder with {0}.bed, or {0}.bed is empty.'.format(args.g))
     log.log('begin GWAS analysis')
-    s = vis.gwas(phe, args.g, args.p, args.phe)
+    s = vis.gwas(phe, args.g, args.p, args.phe, args.gwas_model)
     if s is None:
-        log.log('calculated related_martix faild, please cheak your genotype.')
+        log.log('calculated related_martix faild, please check your genotype file.')
         sys.exit()
     else:
+        if not isinstance(s, list) and s == 1:
+            log.log('GWAS analysis is failed, please check your genotype file or phenotype file.')
+            sys.exit()
         status = np.array(s) == 0
         fail_phe = phe.columns[~status].astype(str)
         if not status.all():
-            log.log('There are {0} metabolites GWAS is failed , and metabolite name are {1}'.format(np.sum(~status), ','.join(fail_phe)))
+            log.log('There are {0} omics traits GWAS is failed , and omics trait names are {1}'.format(np.sum(~status), ','.join(fail_phe)))
         else:
             log.log('All phenotype GWAS done.')
     if args.visual:
@@ -351,7 +377,7 @@ def visual(args, log):
             log.log('the gene annotation file {} is empty and software is terminated.'.format(args.phe))
             sys.exit()
         qtl_anno = vis.qtl_anno(qtl, anno)
-        qtl_anno.to_csv('test_anno.csv',index=False)
+        qtl_anno.to_csv('test_anno.csv', index=False)
         if os.path.exists(args.o):
             shutil.rmtree(args.o)
         os.makedirs(args.o+'/manhattan_plot')
@@ -361,11 +387,11 @@ def visual(args, log):
             if re.search(r'MODAS/utils', path):
                 shutil.copytree(path+'/assets', args.o + '/assets')
         log.log('begin plot manhattan plot and qqplot')
-        s = vis.gwas_plot_parallel(phe, 1e-2, args.p, 'jpg', args.phe)
+        s = vis.gwas_plot_parallel(phe, 1e-2, args.p, 'jpg', args.phe, args.gwas_model)
         log.log('begin plot boxplot')
         vis.boxplot(phe, g, qtl)
         log.log('begin plot multi trait manhattan plot')
-        vis.multi_trait_plot(phe, './output/', qtl, args.phe, 'multi_trait', 'jpg')
+        vis.multi_trait_plot(phe, './output/', qtl, args.phe, 'multi_trait', 'jpg', args.gwas_model)
         for fn in glob.glob('Manhattan.*jpg'):
             if fn != 'Manhattan.multi_trait.jpg':
                 shutil.move(fn, args.o+'/manhattan_plot')
@@ -374,7 +400,8 @@ def visual(args, log):
         for fn in glob.glob('*boxplot.jpg'):
             shutil.move(fn, args.o+'/boxplot')
         shutil.move('./Manhattan.multi_trait.jpg', args.o)
-        vis.generateHtml(qtl_anno, args.anno, args.o, 2040959)
+        fam = pd.read_csv(args.g+'.fam',sep='\s+')
+        vis.generateHtml(qtl_anno, args.anno, args.o, fam.shape[0])
     log.log('Genome-wide association analysis and visualization is down')
 
 
@@ -432,19 +459,20 @@ if __name__ == "__main__":
     parser_phenorm.add_argument('-pca', action='store_true', help='Correct the differences in phenotype caused by population structure through PCA')
     parser_phenorm.add_argument('-o', default='MODAS_phenorm_output', metavar='[default:MODAS_phenorm_output]', help='output file prefix')
     parser_prescreen = subparsers.add_parser('prescreen', help='prescreening of associated QTLs with lm/lmm', usage='%(prog)s [options]')
-    parser_prescreen.add_argument('-g', metavar='', help='Genotype file in plink bed format, used to calculate the kinship matrix for GWAS analysis')
+    parser_prescreen.add_argument('-g', default=None, metavar='', help='Genotype file in plink bed format, used to calculate the kinship matrix for GWAS analysis')
     parser_prescreen.add_argument('-genome_cluster', metavar='', help='Pseudo-genotype file for phenotype pre-screening, generated by subcommand genoidx')
     parser_prescreen.add_argument('-phe', metavar='', help='Phenotype file for phenotype pre-screening analysis, the file format is csv format, the first column and the first row are the names of inbred lines and phenotypes respectively')
-    parser_prescreen.add_argument('-lm_suggest_pvalue', default=None, type=float, metavar='[default:1/ genome cluster file converted pseudo-SNP number]', help='Linear model suggest pvalue for pseudo-SNP filter used for association analysis in mixed linear model, default 1/ pseudo-genotype file pseudo-snp number' )
-    parser_prescreen.add_argument('-lmm_suggest_pvalue', default=1e-5, type=float, metavar='[default:1e-5]', help=' LMM suggest pvalue for phenotype prescreen, used to obtain candidate phenotypes with significant association analysis signals and significant association regions of phenotypes, default 1e-5')
+    parser_prescreen.add_argument('-gwas_suggest_pvalue', default=None, type=float, metavar='[default:1/ genome cluster file converted pseudo-genotype number]', help='suggested GWAS P value for pseudo-genotype filtering in regional association analysis, default 1/ pseudo-genotype file pseudo-snp number')
+    parser_prescreen.add_argument('-gwas_model', default='MLM', type=str, metavar='[default:MLM]', help='model for pseudo-genotype GWAS analysis, supporting LM(linear model), GLM(general linear model) and MLM(mixed linear model) model, default MLM')
     parser_prescreen.add_argument('-p', default=1, type=int, metavar='[default:1]', help='Number of threads for analysis in prescreen sub command')
     parser_prescreen.add_argument('-o', default='MODAS_prescreen_output', metavar='[default:MODAS_prescreen_output]', help='The prefix of the output file, default MODAS_prescreen_output')
     parser_regiongwas = subparsers.add_parser('regiongwas', help='perform regiongwas to identify QTLs', usage='%(prog)s [options]')
     parser_regiongwas.add_argument('-g', metavar='', help='Genotype file in plink bed format, used to calculate the kinship matrix for regional gwas analysis and extract snp in significant association regions of phenotypes')
     parser_regiongwas.add_argument('-phe', metavar='', help='Candidate phenotype file generated by subcommand prescreen')
     parser_regiongwas.add_argument('-phe_sig_qtl', metavar='', help='Significant association regions of candidate phenotypes file generated by subcommand prescreen')
-    parser_regiongwas.add_argument('-p1', default=1e-7, type=float, metavar='[default:1e-7]', help='Significance threshold for index SNPs, used to determine the phenotype with QTL and index snps of phenotype')
-    parser_regiongwas.add_argument('-p2', default=1e-6, type=float, metavar='[default:1e-6]', help='Secondary significance threshold for clumped SNPs, Used to obtain the secondary significant SNP linked to index snp to determine the reliability of the QTL. MODAS outputs the QTL containing 10 secondary significant SNPs as the phenotypic QTL result')
+    parser_regiongwas.add_argument('-p1', default=None, type=float, metavar='[default:1/snp number in genotype file]', help='Significance threshold for index SNPs, used to determine the phenotype with QTL and index snps of phenotype')
+    parser_regiongwas.add_argument('-p2', default=None, type=float, metavar='[default:10/snp number in genotype file]', help='Secondary significance threshold for clumped SNPs, Used to obtain the secondary significant SNP linked to index snp to determine the reliability of the QTL. MODAS outputs the QTL containing 10 secondary significant SNPs as the phenotypic QTL result')
+    parser_regiongwas.add_argument('-gwas_model', default='MLM', type=str, metavar='[default:MLM]', help='GWAS model for region association analysis, supporting LM, GLM and MLM, default MLM.')
     parser_regiongwas.add_argument('-cluster', action='store_true', help='Cluster phenotype by QTL positon')
     parser_regiongwas.add_argument('-p', default=1, type=int, metavar='[default:1]', help='Number of threads for regional gwas analysis, default 1')
     parser_regiongwas.add_argument('-o', default='MODAS_regiongwas_out', metavar='[default:MODAS_regiongwas_out]', help='The prefix of the output file, default MODAS_regiongwas_out')
@@ -462,6 +490,7 @@ if __name__ == "__main__":
     parser_visual = subparsers.add_parser('visual', help='Whole genome-wide association analysis and visualization', usage='%(prog)s [options]')
     parser_visual.add_argument('-g', metavar='', help='Genotype file in plink bed format for whole genome-wide association analysis')
     parser_visual.add_argument('-phe', metavar='', help='Phenotype file for GWAS analysis and visualization')
+    parser_visual.add_argument('-gwas_model', default='gemma_MLM', type=str, metavar='[default:gemma_MLM]', help='model for GWAS analysis, supports the models provided by gemma, rMVP, and GAPIT software, including gemma_LM, gemma_MLM, rMVP_GLM, rMVP_MLM, rMVP_FarmCPU, GAPIT_GLM, GAPIT_MLM, GAPIT_CMLM, GAPIT_MLMM, GAPIT_FarmCPU, GAPIT_Blink. Default is gemma_MLM.')
     parser_visual.add_argument('-qtl', metavar='', help='Phenotype QTL file generated by subcommand regiongwas')
     parser_visual.add_argument('-visual', action='store_true', help='Generate web-based GWAS visualization results')
     parser_visual.add_argument('-anno', metavar='', help='Gene annotation file for QTL annotation, used to display QTL information in visualized results')

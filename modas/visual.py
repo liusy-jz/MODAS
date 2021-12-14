@@ -6,8 +6,10 @@ from rpy2.robjects import pandas2ri
 from rpy2.rinterface_lib.embedded import RRuntimeError
 import rpy2.robjects as robjects
 from collections import Counter
+import modas.gwas_cmd as gc
 import pyranges as pr
 from yattag import Doc, indent
+import shutil
 import warnings
 import glob
 import os
@@ -20,46 +22,136 @@ robjects.r('options(datatable.showProgress = FALSE)')
 
 warnings.filterwarnings("ignore")
 
-def gwas(phe, geno, num_threads, phe_fn):
+# def gwas(phe, geno, num_threads, phe_fn):
+#     geno_prefix = geno.split('/')[-1]
+#     related_matrix_cmd = 'gemma.linux -bfile {0}.link -gk 1 -o {1}'.format(geno_prefix,geno_prefix)
+#     gwas_cmd = 'gemma.linux -bfile {0}.link -k output/{0}.cXX.txt -lmm -n {1} -o {2}'
+#     fam = pd.read_csv(geno+'.fam', sep=r'\s+', header=None)
+#     fam[5] = 1
+#     fam = pd.merge(fam, phe, left_on=0, right_index=True, how='left')
+#     fam.to_csv(geno_prefix+'.link.fam', sep='\t', na_rep='NA', header=None, index=False)
+#     if os.path.exists(geno_prefix+'.link.bed'):
+#         os.remove(geno_prefix+'.link.bed')
+#     if os.path.exists(geno_prefix+'.link.bim'):
+#         os.remove(geno_prefix+'.link.bim')
+#     os.symlink(geno+'.bed', geno_prefix+'.link.bed')
+#     os.symlink(geno+'.bim', geno_prefix+'.link.bim')
+#     values = list()
+#     for _, p in enumerate(phe.columns):
+#         p = p.replace('/', '.')
+#         values.append((gwas_cmd.format(*[geno_prefix, _ + 2, '.'.join(phe_fn.split('/')[-1].split('.')[:-1])+ '_' + str(p)]),))
+#     s = mp.run(related_matrix_cmd)
+#     if s != 0:
+#         return None
+#     else:
+#         s = mp.parallel(mp.run, values, num_threads)
+#         os.remove(geno_prefix+'.link.bed')
+#         os.remove(geno_prefix+'.link.bim')
+#         os.remove(geno_prefix+'.link.fam')
+#         return s
+
+
+def gwas(phe, geno, num_threads, phe_fn, gwas_model):
+    software, model = gwas_model.split('_')
     geno_prefix = geno.split('/')[-1]
-    related_matrix_cmd = 'gemma.linux -bfile {0}.link -gk 1 -o {1}'.format(geno_prefix,geno_prefix)
-    gwas_cmd = 'gemma.linux -bfile {0}.link -k output/{0}.cXX.txt -lmm -n {1} -o {2}'
-    fam = pd.read_csv(geno+'.fam', sep=r'\s+', header=None)
-    fam[5] = 1
-    fam = pd.merge(fam, phe, left_on=0, right_index=True, how='left')
-    fam.to_csv(geno_prefix+'.link.fam', sep='\t', na_rep='NA', header=None, index=False)
-    if os.path.exists(geno_prefix+'.link.bed'):
-        os.remove(geno_prefix+'.link.bed')
-    if os.path.exists(geno_prefix+'.link.bim'):
-        os.remove(geno_prefix+'.link.bim')
-    os.symlink(geno+'.bed', geno_prefix+'.link.bed')
-    os.symlink(geno+'.bim', geno_prefix+'.link.bim')
+    phe_fn = '.'.join(phe_fn.split('/')[-1].split('.')[:-1])
+    if software == 'gemma' and model == 'MLM':
+        geno_prefix = geno.split('/')[-1]
+        related_matrix_cmd = 'gemma.linux -bfile {0}.link -gk 1 -o {1}'.format(geno_prefix,geno_prefix)
+        fam = pd.read_csv(geno + '.fam', sep=r'\s+', header=None)
+        fam[5] = 1
+        fam = pd.merge(fam, phe, left_on=0, right_index=True, how='left')
+        fam.to_csv(geno_prefix+'.link.fam', sep='\t', na_rep='NA', header=None, index=False)
+    if software != 'GAPIT' and gwas_model != 'gemma_LM':
+        if os.path.exists(geno_prefix+'.link.bed'):
+            os.remove(geno_prefix+'.link.bed')
+        if os.path.exists(geno_prefix+'.link.bim'):
+            os.remove(geno_prefix+'.link.bim')
+        os.symlink(geno+'.bed', geno_prefix+'.link.bed')
+        os.symlink(geno+'.bim', geno_prefix+'.link.bim')
+    if software == 'rMVP':
+        if os.path.exists(geno_prefix+'.link.fam'):
+            os.remove(geno_prefix+'.link.fam')
+        os.symlink(geno + '.fam', geno_prefix + '.link.fam')
+        fam = pd.read_csv(geno + '.fam', sep=r'\s+', header=None)
+        phe = phe.reindex(fam[0])
+    if software == 'gemma' and model == "LM":
+        if os.path.exists('./gemma_lm_geno'):
+            shutil.rmtree('./gemma_lm_geno')
+        os.mkdir('./gemma_lm_geno')
+        for p in phe.columns:
+            p = p.replace('m/z', 'm.z')
+            os.symlink('../' + geno + '.bed', './gemma_lm_geno/' + geno_prefix + '_' + p + '.link.bed')
+            os.symlink('../' + geno + '.bim', './gemma_lm_geno/' + geno_prefix + '_' + p + '.link.bim')
+            fam = pd.read_csv(geno + '.fam', sep=r'\s+', header=None)
+            fam = pd.merge(fam.iloc[:, :5], phe.loc[:, p.replace('m.z', 'm/z')].to_frame(), left_on=0, right_index=True, how='left')
+            fam.to_csv('./gemma_lm_geno/' + geno_prefix + '_' + p + '.link.fam', sep='\t', na_rep='NA', header=None, index=False)
+
     values = list()
     for _, p in enumerate(phe.columns):
-        p = p.replace('/', '.')
-        values.append((gwas_cmd.format(*[geno_prefix, _ + 2, '.'.join(phe_fn.split('/')[-1].split('.')[:-1])+ '_' + str(p)]),))
-    s = mp.run(related_matrix_cmd)
-    if s != 0:
-        return None
-    else:
+        p = p.replace('m/z', 'm.z')
+        if gwas_model == 'gemma_LM':
+            values.append(((gc.gemma_cmd(model, './gemma_lm_geno/' + geno_prefix + '_' + p + '.link', None, None, '_'.join([phe_fn, gwas_model, p]))),))
+        if gwas_model == 'gemma_MLM':
+            values.append(((gc.gemma_cmd(model, geno_prefix + '.link', geno_prefix, _ + 2, '_'.join([phe_fn, gwas_model, p]))),))
+        if software == 'rMVP':
+            if not os.path.exists('./output'):
+                os.mkdir('./output')
+            omics_phe = phe.loc[:, p.replace('m.z', 'm/z')].to_frame().reset_index()
+            omics_phe.columns = ['Taxa', '_'.join([phe_fn, gwas_model, p])]
+            values.append((model, geno_prefix+'.link', geno_prefix+'.link', omics_phe, 1, './output'))
+    if gwas_model == 'gemma_MLM':
+        s = mp.run(related_matrix_cmd)
+        if s != 0:
+            return None
+    if software == 'gemma':
         s = mp.parallel(mp.run, values, num_threads)
+    if software == 'rMVP':
+        s1 = mp.parallel(gc.rmvp, (values[0],), 1)
+        s = mp.parallel(gc.rmvp, values[1:], num_threads)
+        s = s1 + s
+    if software == 'GAPIT':
+        if not os.path.exists('./output'):
+            os.mkdir('./output')
+        for path in os.environ.get('PATH').split(':'):
+            if re.search(r'MODAS/utils', path):
+                gapit_path = path
+        phe.columns = ['_'.join([phe_fn, gwas_model, p]) for p in phe.columns]
+        phe = phe.reset_index()
+        phe.columns = ['Taxa'] + list(phe.columns[1:])
+        geno = os.path.abspath(geno)
+        os.chdir('./output')
+        s = gc.gapit(model, geno, phe, gapit_path)
+        os.chdir('../')
+    if gwas_model == 'gemma_MLM' or software == 'rMVP':
         os.remove(geno_prefix+'.link.bed')
         os.remove(geno_prefix+'.link.bim')
         os.remove(geno_prefix+'.link.fam')
-        return s
+    if gwas_model == 'gemma_LM':
+        shutil.rmtree('./gemma_lm_geno')
+    return s
 
 
-def gwas_plot(res, p, prefix, t):
+def gwas_plot(res, p, prefix, t, software):
     try:
         base.sink('/dev/null')
         w = data_table.fread(res, data_table=base.getOption("datatable.fread.datatable", False))
-        w_subset = w.loc[w.p_wald <= float(p), :]
-        m = w_subset[['rs', 'chr', 'ps', 'p_wald']]
-        q = w[['rs', 'chr', 'ps', 'p_wald']]
+        if software == 'gemma':
+            w_subset = w.loc[w.p_wald <= float(p), :]
+            m = w_subset[['rs', 'chr', 'ps', 'p_wald']]
+            q = w[['rs', 'chr', 'ps', 'p_wald']]
+        if software == 'rMVP':
+            w_subset = w.loc[w[w.columns[-1]] <= float(p), :]
+            m = w_subset.iloc[:, [0, 1, 2, -1]]
+            q = w.iloc[:, [0, 1, 2, -1]]
+        if software == 'GAPIT':
+            w_subset = w.loc[w['P.value'] <= float(p), :]
+            m = w_subset[['SNP', 'Chromosome', 'Position', 'P.value']]
+            q = w[['SNP', 'Chromosome', 'Position', 'P.value']]
         m.columns = ['SNP', 'Chromosome', 'Position', prefix]
         q.columns = ['SNP', 'Chromosome', 'Position', prefix]
         thresholdi = robjects.FloatVector([1.0 / w.shape[0], 1e-6, 1e-5])
-        lim = -np.log10(min(w_subset['p_wald'])) + 2
+        lim = -np.log10(min(m[prefix])) + 2
         #w_subset = base.subset(w, np.array(w.rx2('p_wald')) <= float(p))
         #m = w_subset.rx(robjects.StrVector(['rs', 'chr', 'ps', 'p_wald']))
         #q = w.rx(robjects.StrVector(['rs', 'chr', 'ps', 'p_wald']))
@@ -89,11 +181,18 @@ def gwas_plot(res, p, prefix, t):
         return 1
 
 
-def gwas_plot_parallel(phe, p, threads, t, phe_fn):
+def gwas_plot_parallel(phe, p, threads, t, phe_fn, gwas_model):
+    software, model = gwas_model.split('_')
     values = list()
     for i in phe.columns:
-        i = i.replace('/', '.')
-        values.append(('output/' + '.'.join(phe_fn.split('/')[-1].split('.')[:-1])+ '_' + str(i)+'.assoc.txt', p, '.'.join(phe_fn.split('/')[-1].split('.')[:-1]) + '_' + str(i), t))
+        i = str(i).replace('m/z', 'm.z')
+        if software == 'gemma':
+            gwas_fn = 'output/' + '_'.join(['.'.join(phe_fn.split('/')[-1].split('.')[:-1]), gwas_model, str(i)]) + '.assoc.txt'
+        if software == 'rMVP':
+            gwas_fn = 'output/' + '_'.join(['.'.join(phe_fn.split('/')[-1].split('.')[:-1]), gwas_model, str(i)]) + '.'.join(['.'+model, 'csv'])
+        if software == 'GAPIT':
+            gwas_fn = 'output/' + '.'.join(['GAPIT', model, '_'.join(['.'.join(phe_fn.split('/')[-1].split('.')[:-1]), gwas_model, str(i)]), 'GWAS', 'Results', 'csv'])
+        values.append((gwas_fn, p, '.'.join(phe_fn.split('/')[-1].split('.')[:-1]) + '_' + str(i), t, software))
     s = mp.parallel(gwas_plot, values, threads)
     return s
 
@@ -141,18 +240,37 @@ def boxplot(phe, g, qtl):
     g = g.reindex(ril)
     phe = phe.reindex(ril)
     for index, row in qtl.iterrows():
+        if row['phe_name'] not in phe.columns:
+            continue
         d = pd.concat([phe[row['phe_name']], g[row['SNP']]], axis=1)
         d.columns = ['trait.' + d.columns[0].replace('-', '.'), 'haplotype']
         level = robjects.StrVector([allele[row['SNP']]['a1'].values*2, allele[row['SNP']]['a0'].values*2])
         box_plot(d, row['phe_name'], row['SNP'], level)
     base.sink()
 
-def multi_trait_plot(phe, gwas_dir, qtl, phe_fn, prefix, t):
+
+def multi_trait_plot(phe, gwas_dir, qtl, phe_fn, prefix, t, gwas_model):
+    software, model = gwas_model.split('_')
     bk = pd.DataFrame()
     for i in phe.columns:
         i = i.replace('/', '.')
-        fn = gwas_dir + '/' + '.'.join(phe_fn.split('/')[-1].split('.')[:-1]) + '_' + str(i)+'.assoc.txt'
-        d = pd.read_csv(fn, sep='\t')
+        # fn = gwas_dir + '/' + '.'.join(phe_fn.split('/')[-1].split('.')[:-1]) + '_' + str(i)+'.assoc.txt'
+        if software == 'gemma':
+            gwas_fn = gwas_dir + '_'.join(['.'.join(phe_fn.split('/')[-1].split('.')[:-1]), gwas_model, str(i)]) + '.assoc.txt'
+            d = pd.read_csv(gwas_fn, sep='\t')
+            d = d[['rs', 'chr', 'ps', 'p_wald']]
+        if software == 'rMVP':
+            gwas_fn = gwas_dir + '_'.join(['.'.join(phe_fn.split('/')[-1].split('.')[:-1]), gwas_model, str(i)]) + '.'.join(['.' + model, 'csv'])
+            d = pd.read_csv(gwas_fn)
+            d = d.iloc[:, [0, 1, 2, -1]]
+            d.columns = ['rs', 'chr', 'ps', 'p_wald']
+        if software == 'GAPIT':
+            gwas_fn = gwas_dir + '.'.join(['GAPIT', model, '_'.join(['.'.join(phe_fn.split('/')[-1].split('.')[:-1]), gwas_model, str(i)]), 'GWAS', 'Results', 'csv'])
+            d = pd.read_csv(gwas_fn)
+            d = d[['SNP', 'Chromosome', 'Position ', 'P.value']]
+            d.columns = ['rs', 'chr', 'ps', 'p_wald']
+
+        # d = pd.read_csv(gwas_fn, sep='\t')
         if bk.empty:
             bk = d.copy()
             bk.loc[bk.p_wald <= 1e-5, 'p_wald'] = 1e-5
@@ -184,6 +302,7 @@ def multi_trait_plot(phe, gwas_dir, qtl, phe_fn, prefix, t):
            signal_pch=robjects.IntVector([19, 19, 19]), dpi=300,
            signal_col=robjects.StrVector(['red', 'green', 'blue']), multracks=False, LOG10=True, file=t)
     base.sink()
+
 
 def qtl_anno(qtl, anno):
     anno = anno[['geneid', 'position']]

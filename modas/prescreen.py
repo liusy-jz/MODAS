@@ -2,7 +2,21 @@ import pandas as pd
 import numpy as np
 import modas.multiprocess as mp
 from sklearn.preprocessing import MinMaxScaler
-import os,glob
+import os, glob
+import logging, re
+from rpy2.robjects import pandas2ri
+from rpy2.rinterface_lib.embedded import RRuntimeError
+import rpy2.robjects as robjects
+from rpy2.robjects.packages import importr
+from rpy2.rinterface_lib.callbacks import logger as rpy2_logger
+
+
+pandas2ri.activate()
+rpy2_logger.setLevel(logging.ERROR)
+rMVP = importr('rMVP')
+base = importr('base')
+bigmemory = importr('bigmemory')
+
 
 def qtl_pc2bimbam(qtl_pc):
     #qtl_pc.loc[:,:] = np.around(MinMaxScaler(feature_range=(0, 2)).fit_transform(qtl_pc.values),decimals=3)
@@ -15,90 +29,138 @@ def qtl_pc2bimbam(qtl_pc):
     return a,g
 
 
-def qtl_pc_genotype_subset(g,a,rs,output_dir,phe):
-    sub_g = g.loc[g.iloc[:,0].isin(rs),:]
-    sub_a = a.loc[g.iloc[:,0].isin(rs),:]
-    sub_g.to_csv(output_dir+'tmp_'+phe.replace('m/z','m.z')+'.geno.txt',index=False,header=None)
-    sub_a.to_csv(output_dir+'tmp_'+phe.replace('m/z','m.z')+'.anno.txt',index=False,header=None)
+def qtl_pc_gwas_parallel(omics_phe, bimbam_dir, threads, geno, geno_prefix, gwas_model):
+    qtl_pc_gwas_args = list()
+    if gwas_model == 'MLM' or gwas_model == 'GLM':
+        fam = pd.read_csv(geno + '.fam', sep=r'\s+', header=None)
+        fam[5] = 1
+        fam.to_csv(geno_prefix + '.link.fam', sep='\t', na_rep='NA', header=None, index=False)
+        #omics_phe = omics_phe.reindex(fam[0].values)
+        if os.path.exists(geno_prefix + '.link.bed'):
+            os.remove(geno_prefix + '.link.bed')
+        if os.path.exists(geno_prefix + '.link.bim'):
+            os.remove(geno_prefix + '.link.bim')
+        os.symlink(geno + '.bed', geno_prefix + '.link.bed')
+        os.symlink(geno + '.bim', geno_prefix + '.link.bim')
+        if gwas_model == 'MLM':
+            related_matrix_cmd = 'gemma.linux -bfile {0}.link -gk 1 -o {1}'.format(geno_prefix,geno_prefix)
+            s = mp.run(related_matrix_cmd)
+            if s!=0:
+                return None
+    if gwas_model == 'MLM':
+        gemma_cmd = 'gemma.linux -g {0} -a {1} -p {2} -k ./output/{3}.cXX.txt -lmm -n 1 -o {4}'
+    elif gwas_model == 'LM':
+        gemma_cmd = 'gemma.linux -g {0} -a {1} -p {2} -lm  -o {3}'
+    else:
+        g = pd.read_csv(bimbam_dir.strip('/')+'/'+geno_prefix+'_qtl_pc.geno.txt',header=None)
+        a = pd.read_csv(bimbam_dir.strip('/')+'/'+geno_prefix+'_qtl_pc.anno.txt',header=None)
+        g.iloc[:,3:].to_csv(geno_prefix+'.numeric.txt',index=False, header=None, sep='\t')
+        a.columns = ['SNP', 'Pos', 'Chr']
+        a = a[['SNP', 'Chr', 'Pos']]
+        a.to_csv(geno_prefix+'.map.txt', index=False, sep='\t')
 
-
-def generate_omics_qtl_pc_bimbam(omics_phe,a,g,lm_suggest_pvalue,threads):
-    prefix = 'tmp_omics_phe_bimbam/'
-    #subset_genotype_args = list()
-    g.index = g['index']
-    a.index = g['index']
-    for phe in omics_phe.columns:
-        gwas = pd.read_csv('output/'+phe.replace('m/z','m.z')+'_bimbam_lm.assoc.txt',sep='\t')
-        rs = gwas.loc[gwas.p_wald <= lm_suggest_pvalue,'rs']
-        #index = g.iloc[:,0].isin(rs)
-        #sub_g = g.loc[index,:]
-        #sub_a = a.loc[index,:]
-        sub_g = g.reindex(rs)
-        sub_a = a.reindex(rs)
-        sub_g.to_csv(prefix+'tmp_'+phe.replace('m/z','m.z')+'.geno.txt',index=False,header=None)
-        sub_a.to_csv(prefix+'tmp_'+phe.replace('m/z','m.z')+'.anno.txt',index=False,header=None)
-#        subset_genotype_args.append((g,a,rs,prefix,phe))
-#    s = mp.parallel(qtl_pc_genotype_subset,subset_genotype_args, threads)
-
-
-def qtl_pc_lm_gwas_parallel(omics_phe,bimbam_dir,threads,geno):
-    qtl_pc_lm_args = list()
-    geno_prefix = geno.split('/')[-1]
-    gemma_cmd = 'gemma.linux -g {0} -a {1} -p {2} -lm  -o {3}'
     for m in omics_phe.columns:
+        m = m.replace('m/z', 'm.z')
         phe = omics_phe[m].to_frame()
-        m = m.replace('m/z','m.z')
-        phe.to_csv(bimbam_dir.strip('/')+'/'+m+'_phe.txt',index=False,header=None,na_rep='NA')
-        qtl_pc_lm_args.append((gemma_cmd.format(bimbam_dir.strip('/')+'/'+geno_prefix+'_qtl_pc.geno.txt',bimbam_dir.strip('/')+'/'+geno_prefix+'_qtl_pc.anno.txt',bimbam_dir.strip('/')+'/'+m+'_phe.txt',m+'_bimbam_lm'),))
-    s = mp.parallel(mp.run, qtl_pc_lm_args, threads)
-    return s
-
-
-def qtl_pc_lmm_gwas_parallel(omics_phe,bimbam_dir,threads,geno,sample_id):
-    qtl_pc_lmm_args = list()
-    #g = read_plink1_bin(geno+'.bed', geno+'.bim', geno+'.fam', verbose=False)
-    #g = g.sel(sample=sample_id)
-    geno_prefix = geno.split('/')[-1]
-    #if os.path.exists(geno_prefix+'.link.bed'):
-    #    os.remove(geno_prefix+'.link.bed')
-    #if os.path.exists(geno_prefix+'.link.bim'):
-    #    os.remove(geno_prefix+'.link.bim')
-    #write_plink1_bin(g,geno_prefix+'.link.bed', geno_prefix+'.link.bim,', geno_prefix+'.link.fam',verbose=False)
-    fam = pd.read_csv(geno+'.fam', sep=r'\s+', header=None)
-    fam[5] = 1
-    fam.to_csv(geno_prefix+'.link.fam', sep='\t', na_rep='NA', header=None, index=False)
-    omics_phe = omics_phe.reindex(fam[0].values)
-    omics_phe.to_csv('bimbam_phe.txt',sep='\t',index=False,header=None,na_rep='NA')
-    if os.path.exists(geno_prefix+'.link.bed'):
+        phe.to_csv(bimbam_dir.strip('/') + '/' + m + '_phe.txt', index=False, header=None, na_rep='NA')
+        if gwas_model == 'MLM':
+            qtl_pc_gwas_args.append((gemma_cmd.format(bimbam_dir.strip('/') + '/'+geno_prefix+'_qtl_pc.geno.txt', bimbam_dir.strip('/') + '/'+geno_prefix+'_qtl_pc.anno.txt', bimbam_dir.strip('/') + '/' + m + '_phe.txt',geno_prefix, m + '_prescreen'),))
+        elif gwas_model == 'LM':
+            qtl_pc_gwas_args.append((gemma_cmd.format(bimbam_dir.strip('/')+'/'+geno_prefix+'_qtl_pc.geno.txt',bimbam_dir.strip('/')+'/'+geno_prefix+'_qtl_pc.anno.txt',bimbam_dir.strip('/')+'/'+m+'_phe.txt',m+'_prescreen'),))
+        #else:
+        #    qtl_pc_gwas_args.append((phe.reset_index(), geno_prefix+'.link', geno_prefix+'.numeric.txt', geno_prefix+'.map.txt', 1, './output'))
+    if gwas_model == 'LM' or gwas_model == 'MLM':
+        s = mp.parallel(mp.run, qtl_pc_gwas_args, threads)
+    else:
+        if not os.path.exists('./output'):
+            os.mkdir('./output')
+        #s = mp.parallel(glm_gwas, (qtl_pc_gwas_args[0],), 1)
+        #s = mp.parallel(glm_gwas, qtl_pc_gwas_args[1:], threads)
+        omics_phe.columns = [i.replace('m/z', 'm.z') for i in omics_phe.columns]
+        s = glm_gwas(omics_phe, geno_prefix+'.link', geno_prefix+'.numeric.txt', geno_prefix+'.map.txt', 1, './output')
+    if gwas_model == 'MLM' or gwas_model == 'GLM':
         os.remove(geno_prefix+'.link.bed')
-    if os.path.exists(geno_prefix+'.link.bim'):
         os.remove(geno_prefix+'.link.bim')
-    os.symlink(geno+'.bed', geno_prefix+'.link.bed')
-    os.symlink(geno+'.bim', geno_prefix+'.link.bim')
-    related_matrix_cmd = 'gemma.linux -bfile {0}.link -gk 1 -o {1}'.format(geno_prefix,geno_prefix)
-    s = mp.run(related_matrix_cmd)
-    if s!=0:
-        return None
-    gemma_cmd = 'gemma.linux -g {0} -a {1} -p bimbam_phe.txt -k ./output/{2}.cXX.txt -lmm -n {3} -o {4}'
-    for _,m in enumerate(omics_phe.columns):
-        m = m.replace('m/z','m.z')
-        qtl_pc_lmm_args.append((gemma_cmd.format(bimbam_dir.strip('/')+'/tmp_'+m+'.geno.txt',bimbam_dir.strip('/')+'/tmp_'+m+'.anno.txt',geno_prefix,_+1,m+'_bimbam'),))
-    s = mp.parallel(mp.run, qtl_pc_lmm_args, threads)
-    os.remove(geno_prefix+'.link.bed')
-    os.remove(geno_prefix+'.link.bim')
-    os.remove(geno_prefix+'.link.fam')
+        os.remove(geno_prefix+'.link.fam')
     return s
 
-def prescreen(omics_phe,lmm_suggest_pvalue):
+
+def glm_gwas(omics_phe, pc_geno_prefix, genofile, mapfile, threads, out_path):
+    try:
+        geno_prefix = '.'.join(genofile.split('/')[-1].split('.')[:-2])
+        base.sink('/dev/null')
+        robjects.r('''
+                gwas <- function(omics_phe, pc_geno_prefix, geno_prefix, genofile, mapfile, threads, out_path){
+                    library(rMVP)
+                    if(!file.exists(paste(pc_geno_prefix,'.pc.desc',sep=''))){
+                         MVP.Data(fileBed=pc_geno_prefix, fileKin=F, filePC=F, out=pc_geno_prefix, verbose=F)
+                         MVP.Data.PC(T,mvp_prefix=pc_geno_prefix, pcs.keep=5, verbose=F)
+                    }
+                    MVP.Data(fileNum=genofile, fileMap=mapfile, fileKin=F, filePC=F, sep_num='\t', type.geno='double', out=geno_prefix)
+                    geno = attach.big.matrix(paste(geno_prefix, '.geno.desc',sep=''))
+                    map_file = read.table(paste(geno_prefix, '.geno.map',sep=''),sep='\t',header=T)
+                    Covariates_PC = bigmemory::as.matrix(attach.big.matrix(paste(pc_geno_prefix,'.pc.desc',sep='')))
+                    phe_name = names(omics_phe)
+                    for(i in 2:ncol(omics_phe)){
+                        mvp = MVP(phe=omics_phe[,c(1,i)], geno=geno, map=map_file, CV.GLM=Covariates_PC, priority='speed', nPC.GLM=5,
+                        ncpus=threads, maxLoop=10, threshold=0.05, method=c('GLM'), file.output=F, verbose=F)
+                        res = cbind(mvp$map, mvp$glm.results)
+                        names(res) <- c('rs', 'chr', 'ps', 'effect', 'se', 'p_wald')
+                        print(head(res))
+                        write.table(res,file=paste(out_path,'/',as.character(phe_name[i]),'_prescreen.assoc.txt',sep=''),sep='\t', quote=F, row.names=F)
+                    }
+                }
+                ''')
+        gwas = robjects.r('gwas')
+        gwas(omics_phe, pc_geno_prefix, geno_prefix, genofile, mapfile, threads, out_path)
+        base.sink()
+    except RRuntimeError:
+        return 0
+    except ValueError:
+        return 0
+    else:
+        return 1
+
+# def glm_gwas(omics_phe, pc_geno_prefix, genofile, mapfile, threads, out_path):
+#     try:
+#         geno_prefix = '.'.join(genofile.split('/')[-1].split('.')[:-2])
+#         base.sink('/dev/null')
+#         if not os.path.exists(pc_geno_prefix + '.pc.desc'):
+#             rMVP.MVP_Data(fileBed=pc_geno_prefix, fileKin=False, filePC=False, out=pc_geno_prefix,
+#                           verbose=False)
+#             rMVP.MVP_Data_PC(True, mvp_prefix=pc_geno_prefix, pcs_keep=5, verbose=False)
+#         rMVP.MVP_Data(fileNum=genofile, fileMap=mapfile, fileKin=False, filePC=False, sep_num = '\t', type_geno='double',out=geno_prefix, verbose=False)
+#         geno = bigmemory.attach_big_matrix(geno_prefix +'.geno.desc')
+#         map_file = pd.read_csv(geno_prefix +'.geno.map', sep='\t')
+#         Covariates_PC = bigmemory.as_matrix(bigmemory.attach_big_matrix(pc_geno_prefix + '.pc.desc'))
+#         # base.setwd('./output')
+#         mvp = rMVP.MVP(phe=omics_phe, geno=geno, map=map_file, CV_GLM=Covariates_PC, priority="speed", nPC_GLM=5,
+#                 ncpus=threads, maxLoop=10, threshold=0.05, method=['GLM'], file_output=False, verbose=False)
+#         gwas_res = pd.DataFrame(mvp.rx2('glm.results'), columns=['effect', 'se', 'p_wald'])
+#         pos = pd.DataFrame(mvp.rx2('map'))
+#         pos.columns = ['rs','chr', 'ps']
+#         pos.index = gwas_res.index
+#         res = pd.concat([pos, gwas_res], axis=1)
+#         res.to_csv(out_path.rstrip('/') + '/' + str(omics_phe.columns[1]) + '_prescreen.assoc.txt', index=False,sep='\t')
+#         base.sink()
+#     except RRuntimeError:
+#         return 0
+#     except ValueError:
+#         return 0
+#     else:
+#         return 1
+
+
+def prescreen(omics_phe,suggest_pvalue):
     phe_sig_qtl = list()
     sig_phe_names = list()
-    for fn in glob.glob('output/*_bimbam.assoc.txt'):
-        gwas = pd.read_csv(fn,sep='\t')
-        if gwas['p_wald'].min() > lmm_suggest_pvalue:
+    for fn in glob.glob('output/*_prescreen.assoc.txt'):
+        gwas = pd.read_csv(fn, sep='\t')
+        if gwas['p_wald'].min() > suggest_pvalue:
             continue
-        phe_name = fn.split('/')[-1].replace('_bimbam.assoc.txt','')
+        phe_name = fn.split('/')[-1].replace('_prescreen.assoc.txt','')
         pos = list()
-        for rs in gwas.loc[gwas.p_wald <= lmm_suggest_pvalue, 'rs'].values:
+        for rs in gwas.loc[gwas.p_wald <= suggest_pvalue, 'rs'].values:
             chrom,start,end = rs.split('_')[1:4]
             start,end = int(start),int(end)
             if not pos:
@@ -114,7 +176,7 @@ def prescreen(omics_phe,lmm_suggest_pvalue):
                     else:
                         pos.append([chrom,start,end,phe_name])
         phe_sig_qtl.extend(pos)
-        if not gwas.loc[gwas.p_wald <= lmm_suggest_pvalue,:].empty:
+        if not gwas.loc[gwas.p_wald <= suggest_pvalue,:].empty:
             sig_phe_names.append(phe_name.replace('m.z','m/z'))
     sig_omics_phe = omics_phe.loc[:, sig_phe_names]
     phe_sig_qtl = pd.DataFrame(phe_sig_qtl,columns=['chr','start','end','phe_name'])

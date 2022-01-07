@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 '''
 File name: setup.py
-Author: CrazyHsu @ crazyhsu9527@gmail.com
+Author: CrazyHsu @ crazyhsu9527@gmail.com 
 Created on: 2020-09-25 15:46:07
-Last modified: 2020-09-25 16:06:19
+Last modified: 2022-01-08 02:00:57
 '''
 
 from setuptools import setup
@@ -21,12 +21,12 @@ setup(name='MODAS',
     scripts=['MODAS.py'],
     install_requires=[
         'cython',
-        'yattag',
-        'pandas_plink',
-        'numpy',
+        'yattag==1.14.0',
         'matplotlib',
-        'pandas',
-        'scipy',
-        'scikit-learn',
+        'numpy==1.21.0',
+        'pandas==1.3.5',
+        'scipy==1.7.3',
+        'scikit-learn==1.0.2',
+        'pandas_plink'
     ]
 )

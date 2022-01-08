@@ -312,7 +312,7 @@ def mr(args, log):
         log.log('perform Mendelian Randomization through mixed linear model')
         MR.generate_geno_batch(qtl, mTrait, pTrait, args.g, args.p, 'tmp_mr_bed', 'tmp_mr_rs')
         MR.calc_MLM_effect('tmp_mr_bed', pTrait, args.p, args.g)
-        mTrait_effect, pTrait_effect, pTrait_se = MR.get_MLM_effect_parallell('./output', args.p)
+        mTrait_effect, pTrait_effect, pTrait_se = MR.get_MLM_effect_parallell('./output', mTrait, pTrait, args.p)
         res = MR.MR_MLM_parallel(qtl, mTrait_effect, pTrait_effect, pTrait_se, args.p, args.pvalue)
         res.to_csv(args.o+'.MR.csv', index=False)
         log.log('Successfully perform Mendelian randomization analysis using mixed linear model')

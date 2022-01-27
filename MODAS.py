@@ -269,6 +269,7 @@ def mr(args, log):
     if not os.path.exists(args.exposure):
         raise ArgsError('the exposure file {} is not exists.'.format(args.exposure))
     mTrait = pd.read_csv(args.exposure, index_col=0)
+    mTrait.columns = [col.replace('m/z', 'm.z') for col in mTrait.columns]
     if mTrait.empty:
         log.log('the exposure file {} is empty and software is terminated.'.format(args.exposure))
         sys.exit()
@@ -287,11 +288,17 @@ def mr(args, log):
     if not os.path.exists(args.g+'.bed'):
         raise ArgsError('the plink bed format genotype file {} is not exists.'.format(args.g))
     if args.lm and args.mlm:
-        log.log('please select linear model or mixed linear model for Mendelian Randomization analysis')
+        log.log('please select linear model or mixed linear model for Mendelian Randomization analysis.')
         log.log('software is terminated.')
         sys.exit()
     if not args.lm and not args.mlm:
-        log.log('please select a model from linear model and mixed linear model for Mendelian Randomization analysis')
+        log.log('please select a model from linear model and mixed linear model for Mendelian Randomization analysis.')
+        log.log('software is terminated.')
+        sys.exit()
+    if mTrait.columns.isin(qtl.phe_name).sum()>0:
+        mTrait = mTrait.loc[:, mTrait.columns.isin(qtl.phe_name)]
+    else:
+        log.log('there is no mTrait in exposure QTL result, please check your QTL file or exposure file.')
         log.log('software is terminated.')
         sys.exit()
     if args.lm:

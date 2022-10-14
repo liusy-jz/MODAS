@@ -60,8 +60,8 @@ def qtl_pc_gwas_parallel(omics_phe, bimbam_dir, threads, geno, geno_prefix, gwas
         a.to_csv(geno_prefix+'.map.txt', index=False, sep='\t')
 
     for m in omics_phe.columns:
-        m = m.replace('m/z', 'm.z')
         phe = omics_phe[m].to_frame()
+        m = m.replace('m/z', 'm.z')
         phe.to_csv(bimbam_dir.strip('/') + '/' + m + '_phe.txt', index=False, header=None, na_rep='NA')
         if gwas_model == 'MLM':
             qtl_pc_gwas_args.append((gemma_cmd.format(bimbam_dir.strip('/') + '/'+geno_prefix+'_qtl_pc.geno.txt', bimbam_dir.strip('/') + '/'+geno_prefix+'_qtl_pc.anno.txt', bimbam_dir.strip('/') + '/' + m + '_phe.txt',geno_prefix, m + '_prescreen'),))

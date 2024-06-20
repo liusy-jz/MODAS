@@ -8,6 +8,7 @@ from rpy2.rinterface_lib.embedded import RRuntimeError
 import rpy2.robjects as robjects
 from rpy2.robjects.packages import importr
 from rpy2.rinterface_lib.callbacks import logger as rpy2_logger
+import subprocess
 import logging
 import glob, os
 import shutil
@@ -18,6 +19,9 @@ rpy2_logger.setLevel(logging.ERROR)
 rMVP = importr('rMVP')
 base = importr('base')
 bigmemory = importr('bigmemory')
+
+utils_path = subprocess.check_output('locate modas/utils', shell=True, text=True, encoding='utf-8')
+utils_path = '/'.join(re.search('\n(.*site-packages.*)\n', utils_path).group(1).split('/')[:-1])
 
 
 def region_gwas_parallel(bed_dir, threads, geno, gwas_model):
@@ -34,7 +38,7 @@ def region_gwas_parallel(bed_dir, threads, geno, gwas_model):
         os.symlink(geno+'.bed', geno_prefix+'.link.bed')
         os.symlink(geno+'.bim', geno_prefix+'.link.bim')
         if gwas_model=='MLM':
-            related_matrix_cmd = 'gemma.linux -bfile {0}.link -gk 1 -o {1}'.format(geno_prefix,geno_prefix)
+            related_matrix_cmd = utils_path + '/gemma -bfile {0}.link -gk 1 -o {1}'.format(geno_prefix,geno_prefix)
             s = mp.run(related_matrix_cmd)
             if s!=0:
                 return None
@@ -103,7 +107,7 @@ def glm_gwas(omics_phe, pc_geno_prefix, geno_prefix, threads):
 
 
 def generate_qtl_batch(omics_phe,phe_sig_qtl,geno_name,threads,bed_dir,rs_dir):
-    plink_extract = 'plink -bfile {} --extract {} --make-bed -out {}'
+    plink_extract = utils_path + '/plink -bfile {} --extract {} --make-bed -out {}'
     bim = pd.read_csv(geno_name+'.bim', sep='\t', header=None)
     qtl_batch = list()
     rs = dict()
@@ -161,7 +165,7 @@ def plink_clump(geno_path, p1, p2, num_threads):
     if os.path.exists('./clump_result'):
         shutil.rmtree('./clump_result')
     os.mkdir('./clump_result')
-    cmd = 'plink --bfile {0} --clump {1}  --clump-p1 {2} --clump-p2 {3} --clump-kb {4} --clump-r2 0.2 --out {5}'
+    cmd = utils_path + '/plink --bfile {0} --clump {1}  --clump-p1 {2} --clump-p2 {3} --clump-kb {4} --clump-r2 0.2 --out {5}'
     cmds = list()
     ms = list()
     for fn in glob.glob('./clump_input/*'):

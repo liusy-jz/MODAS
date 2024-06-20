@@ -201,9 +201,12 @@ def snp_clumping(bed, r2, out):
     import rpy2.robjects as robjects
 
     pandas2ri.activate()
+    base = importr('base')
+    utils = importr('utils')
+    if not base.require('bigsnpr')[0]:
+        utils.install_packages('bigsnpr', dependence=True, repos='https://cloud.r-project.org', quiet=True)
     robjects.r['options'](warn=-1)
     robjects.r('options(datatable.showProgress = FALSE)')
-    base = importr('base')
     base.sink('/dev/null')
     bigsnpr = importr('bigsnpr')
     g = bigsnpr.snp_readBed(bed, backingfile=base.tempfile())

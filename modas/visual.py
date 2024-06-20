@@ -9,6 +9,7 @@ from collections import Counter
 import modas.gwas_cmd as gc
 import pyranges as pr
 from yattag import Doc, indent
+import subprocess
 import shutil
 import warnings
 import glob
@@ -21,6 +22,10 @@ base = importr('base')
 robjects.r('options(datatable.showProgress = FALSE)')
 
 warnings.filterwarnings("ignore")
+
+utils_path = subprocess.check_output('locate modas/utils', shell=True, text=True, encoding='utf-8')
+utils_path = '/'.join(re.search('\n(.*site-packages.*)\n', utils_path).group(1).split('/')[:-1])
+
 
 # def gwas(phe, geno, num_threads, phe_fn):
 #     geno_prefix = geno.split('/')[-1]
@@ -57,7 +62,7 @@ def gwas(phe, geno, num_threads, phe_fn, gwas_model):
     phe_fn = '.'.join(phe_fn.split('/')[-1].split('.')[:-1])
     if software == 'gemma' and model == 'MLM':
         geno_prefix = geno.split('/')[-1]
-        related_matrix_cmd = 'gemma.linux -bfile {0}.link -gk 1 -o {1}'.format(geno_prefix,geno_prefix)
+        related_matrix_cmd = utils_path+'/gemma.linux -bfile {0}.link -gk 1 -o {1}'.format(geno_prefix,geno_prefix)
         fam = pd.read_csv(geno + '.fam', sep=r'\s+', header=None)
         fam[5] = 1
         fam = pd.merge(fam, phe, left_on=0, right_index=True, how='left')
@@ -113,15 +118,12 @@ def gwas(phe, geno, num_threads, phe_fn, gwas_model):
     if software == 'GAPIT':
         if not os.path.exists('./output'):
             os.mkdir('./output')
-        for path in os.environ.get('PATH').split(':'):
-            if re.search(r'MODAS/utils', path):
-                gapit_path = path
         phe.columns = ['_'.join([phe_fn, gwas_model, p]) for p in phe.columns]
         phe = phe.reset_index()
         phe.columns = ['Taxa'] + list(phe.columns[1:])
         geno = os.path.abspath(geno)
         os.chdir('./output')
-        s = gc.gapit(model, geno, phe, gapit_path)
+        s = gc.gapit(model, geno, phe, utils_path)
         os.chdir('../')
     if gwas_model == 'gemma_MLM' or software == 'rMVP':
         os.remove(geno_prefix+'.link.bed')
@@ -160,9 +162,7 @@ def gwas_plot(res, p, prefix, t, software):
         #thresholdi = robjects.FloatVector([1.0/w.nrow, 1e-6, 1e-5])
         #lim = -np.log10(min(np.array(w_subset.rx2('p_wald'))))+2
         #base.sink('/dev/null')
-        for path in os.environ.get('PATH').split(':'):
-            if re.search(r'MODAS/utils',path):
-                robjects.r('source("'+path+'/CMplot.r")')
+        robjects.r('source("'+utils_path+'/CMplot.r")')
         CMplot = robjects.r['CMplot']
         CMplot(m, plot_type='m', col=robjects.StrVector(["grey30", "grey60"]), ylim=robjects.FloatVector([2, lim]), threshold=thresholdi,
                 cex=robjects.FloatVector([0.5, 0.5, 0.5]), signal_cex=robjects.FloatVector([0.5, 0.5, 0.5]),
@@ -289,9 +289,7 @@ def multi_trait_plot(phe, gwas_dir, qtl, phe_fn, prefix, t, gwas_model):
     lim = -np.log10(min(bk['p_wald'])) + 2
     bk.columns = ['SNP', 'Chromosome', 'Position', prefix]
     base.sink('/dev/null')
-    for path in os.environ.get('PATH').split(':'):
-        if re.search(r'MODAS/utils', path):
-            robjects.r('source("'+path+'/CMplot.r")')
+    robjects.r('source("'+utils_path+'/CMplot.r")')
     #robjects.r('source("/home/debian/文档/MGWAP/compound_extract/plot/CMplot.r")')
     CMplot = robjects.r['CMplot']
     CMplot(bk, plot_type='m', col=robjects.StrVector(["grey30", "grey60"]), ylim=robjects.FloatVector([2, lim]),

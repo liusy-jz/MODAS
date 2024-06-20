@@ -5,11 +5,17 @@ from sklearn.linear_model import LinearRegression
 from pandas_plink import read_plink1_bin
 from scipy.stats import chi2
 import modas.multiprocess as mp
+import subprocess
 import warnings
 import shutil
 import glob
 import sys
 import os
+import re
+
+
+utils_path = subprocess.check_output('locate modas/utils', shell=True, text=True, encoding='utf-8')
+utils_path = '/'.join(re.search('\n(.*site-packages.*)\n', utils_path).group(1).split('/')[:-1])
 
 
 def lm_res(y, X):
@@ -63,7 +69,7 @@ def generate_geno_batch(mTrait_qtl, mTrait, pTrait, geno, threads, bed_dir, rs_d
     if os.path.exists(rs_dir):
         shutil.rmtree(rs_dir)
     os.mkdir(rs_dir)
-    plink_extract = 'plink -bfile {} -extract {} --make-bed -out {}'
+    plink_extract = utils_path + '/plink -bfile {} -extract {} --make-bed -out {}'
     geno_batch = list()
     for mTrait_name in mTrait_qtl.phe_name.unique():
         out_name = bed_dir.strip('/') + '/' + mTrait_name
@@ -100,12 +106,12 @@ def calc_MLM_effect(bed_dir, pTrait, threads, geno):
         os.remove(geno_prefix + '.link.bim')
     os.symlink(geno + '.bed', geno_prefix + '.link.bed')
     os.symlink(geno + '.bim', geno_prefix + '.link.bim')
-    related_matrix_cmd = 'gemma.linux -bfile {0}.link -gk 1 -o {1}'.format(geno_prefix, geno_prefix)
+    related_matrix_cmd = utils_path + '/gemma -bfile {0}.link -gk 1 -o {1}'.format(geno_prefix, geno_prefix)
     s = mp.run(related_matrix_cmd)
     if s != 0:
         return None
-    gemma_cmd_mTrait = 'gemma.linux -bfile {0} -k ./output/{1}.cXX.txt -lmm -n 1 -o {2}'
-    gemma_cmd_pTrait = 'gemma.linux -bfile {0} -k ./output/{1}.cXX.txt -lmm -n {2} -o {3}'
+    gemma_cmd_mTrait = utils_path + '/gemma -bfile {0} -k ./output/{1}.cXX.txt -lmm -n 1 -o {2}'
+    gemma_cmd_pTrait = utils_path + '/gemma -bfile {0} -k ./output/{1}.cXX.txt -lmm -n {2} -o {3}'
     for i in glob.glob(bed_dir + '/*.bed'):
         i = i.replace('.bed', '')
         if i.split('/')[-1] != 'pTrait':

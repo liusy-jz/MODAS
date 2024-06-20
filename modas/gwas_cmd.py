@@ -6,6 +6,7 @@ from rpy2.rinterface_lib.embedded import RRuntimeError
 import rpy2.robjects as robjects
 from rpy2.robjects.packages import importr
 from rpy2.rinterface_lib.callbacks import logger as rpy2_logger
+import subprocess
 import logging
 import glob, os
 import shutil
@@ -19,11 +20,15 @@ data_table = importr('data.table')
 bigmemory = importr('bigmemory')
 
 
+utils_path = subprocess.check_output('locate modas/utils', shell=True, text=True, encoding='utf-8')
+utils_path = '/'.join(re.search('\n(.*site-packages.*)\n', utils_path).group(1).split('/')[:-1])
+
+
 def gemma_cmd(model, geno_prefix, kin_prefix, n, out_prefix):
     if model == 'LM':
-        return 'gemma.linux -bfile {0} -lm  -o {1}'.format(geno_prefix, out_prefix)
+        return utils_path + '/gemma -bfile {0} -lm  -o {1}'.format(geno_prefix, out_prefix)
     if model == 'MLM':
-        return 'gemma.linux -bfile {0} -k ./output/{1}.cXX.txt -lmm -n {2} -o {3}'.format(geno_prefix, kin_prefix, n, out_prefix)
+        return utils_path + '/gemma -bfile {0} -k ./output/{1}.cXX.txt -lmm -n {2} -o {3}'.format(geno_prefix, kin_prefix, n, out_prefix)
 
 
 def rmvp(model, cv_geno_prefix, geno_prefix, omics_phe, threads, out_path):

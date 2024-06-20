@@ -9,12 +9,22 @@ from rpy2.rinterface_lib.embedded import RRuntimeError
 import rpy2.robjects as robjects
 from rpy2.robjects.packages import importr
 from rpy2.rinterface_lib.callbacks import logger as rpy2_logger
+import subprocess
 
 
 pandas2ri.activate()
 rpy2_logger.setLevel(logging.ERROR)
-rMVP = importr('rMVP')
 base = importr('base')
+utils = importr('utils')
+
+utils_path = subprocess.check_output('locate modas/utils', shell=True, text=True, encoding='utf-8')
+utils_path = '/'.join(re.search('\n(.*site-packages.*)\n', utils_path).group(1).split('/')[:-1])
+
+if not base.require('rMVP')[0]:
+    utils.install_packages(np.array(['data.table', 'ggplot2', 'ggsignif', 'Matrix', 'bigmemory', 'RcppProgress', 'BH']), repos='https://cloud.r-project.org', quiet=True)
+    utils.install_packages(utils_path + '/rMVP_1.0.6_modify.tar.gz', repos=robjects.rinterface.NULL, type='source', quiet=True)
+    utils.install_packages('bigsnpr', dependence=True, repos='https://cloud.r-project.org', quiet=True)
+rMVP = importr('rMVP')
 bigmemory = importr('bigmemory')
 
 
@@ -43,14 +53,14 @@ def qtl_pc_gwas_parallel(omics_phe, bimbam_dir, threads, geno, geno_prefix, gwas
         os.symlink(geno + '.bed', geno_prefix + '.link.bed')
         os.symlink(geno + '.bim', geno_prefix + '.link.bim')
         if gwas_model == 'MLM':
-            related_matrix_cmd = 'gemma.linux -bfile {0}.link -gk 1 -o {1}'.format(geno_prefix,geno_prefix)
+            related_matrix_cmd = utils_path + '/gemma -bfile {0}.link -gk 1 -o {1}'.format(geno_prefix,geno_prefix)
             s = mp.run(related_matrix_cmd)
             if s!=0:
                 return None
     if gwas_model == 'MLM':
-        gemma_cmd = 'gemma.linux -g {0} -a {1} -p {2} -k ./output/{3}.cXX.txt -lmm -n 1 -o {4}'
+        gemma_cmd = utils_path + '/gemma -g {0} -a {1} -p {2} -k ./output/{3}.cXX.txt -lmm -n 1 -o {4}'
     elif gwas_model == 'LM':
-        gemma_cmd = 'gemma.linux -g {0} -a {1} -p {2} -lm  -o {3}'
+        gemma_cmd = utils_path + '/gemma -g {0} -a {1} -p {2} -lm  -o {3}'
     else:
         g = pd.read_csv(bimbam_dir.strip('/')+'/'+geno_prefix+'_qtl_pc.geno.txt',header=None)
         a = pd.read_csv(bimbam_dir.strip('/')+'/'+geno_prefix+'_qtl_pc.anno.txt',header=None)

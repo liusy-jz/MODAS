@@ -1,0 +1,47 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "MODAS"
+version = "2.1.5"
+description = "MODAS: Multi-omics data association study"
+keywords = ["multi-omics", "GWAS", "Mendelian randomization", "contrastive PCA"]
+requires-python = ">=3.8"
+readme = "README.md"
+license = {file = "LICENSE"}
+authors = [
+  {name = "syliu", email = "songyu__liu@163.com" },
+  {name = "CrazyHsu", email = "crazyhsu9527@gmail.com" },
+
+]
+maintainers = [
+  {name = "syliu", email = "songyu__liu@163.com"}
+]
+classifiers = [
+  "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.8"
+]
+dependencies = [
+  "cython",
+  "yattag==1.14.0",
+  "matplotlib",
+  "numpy",
+  "pandas",
+  "scipy",
+  "scikit-learn",
+  "rpy2",
+  "pandas_plink",
+  "pyranges",
+  "bioframe",
+  "image_match3",
+  "statsmodels"
+]
+
+[project.urls]
+Documentation = "https://modas-bio.github.io/"
+Repository = "https://github.com/liusy-jz/MODAS.git"
+
+[project.scripts]
+MODAS = "modas.MODAS:main"

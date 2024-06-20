@@ -29,7 +29,7 @@ RUN conda config --add channels https://mirrors.tuna.tsinghua.edu.cn/anaconda/pk
     conda config --add channels https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/main/ && \
     conda config --add channels https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge/ && \
     conda config --add channels https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/bioconda/ && \
-    conda update --all -y && conda create -n modas python=3.7.8 -y
+    conda update --all -y && conda create -n modas python=3.8 -y
 
 ENV CONDA_DEFAULT_ENV=modas
 ENV CONDA_PREFIX=/root/conda/envs/$CONDA_DEFAULT_ENV
@@ -38,19 +38,8 @@ ENV CONDA_AUTO_UPDATE_CONDA=false
 RUN echo ". /root/conda/etc/profile.d/conda.sh" >> ~/.bashrc && \
     echo "conda activate modas" >> ~/.bashrc
 
-RUN git clone https://hub.fastgit.org/liusy-jz/MODAS.git /root/MODAS && \
-    cd /root/MODAS && \
-    $CONDA_PREFIX/bin/python setup.py build && \
-    $CONDA_PREFIX/bin/python setup.py install
-WORKDIR /root/MODAS
-RUN chmod +x MODAS.py
-
 RUN mkdir /root/.pip && echo "[global]\nindex-url = https://pypi.tuna.tsinghua.edu.cn/simple" > /root/.pip/pip.conf && \
-    $CONDA_PREFIX/bin/pip install pyranges && \
+    $CONDA_PREFIX/bin/pip install MODAS && \
     conda install -y -c conda-forge r-rcppeigen r=3.6 rpy2 && \
     conda install -y -c anaconda gcc_linux-64 gxx_linux-64 gfortran_linux-64
 
-ENV PATH=$CONDA_PREFIX/bin:/root/MODAS/utils:$PATH
-RUN $CONDA_PREFIX/bin/R -e 'install.packages(c("data.table", "ggplot2", "ggsignif", "Matrix", "bigmemory", "RcppProgress"), repos="https://cloud.r-project.org")' && \
-    $CONDA_PREFIX/bin/R -e 'install.packages("bigsnpr", dependence=T, repos="https://cloud.r-project.org")' && \
-    $CONDA_PREFIX/bin/R -e 'install.packages("utils/rMVP_1.0.6_modify.tar.gz", repos=NULL,type="source")'

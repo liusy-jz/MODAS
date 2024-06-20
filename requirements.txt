@@ -1,9 +1,0 @@
-cython
-yattag
-pyranges
-pandas_plink
-numpy
-matplotlib
-pandas
-scipy
-sklearn

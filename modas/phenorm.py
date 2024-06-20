@@ -52,9 +52,9 @@ def normalize_scale(d):
 
 def ppoints(n, a=None):
     try:
-        n = np.float(len(n))
+        n = np.float64(len(n))
     except TypeError:
-        n = np.float(n)
+        n = np.float64(n)
     if a is None:
         a = 3.0/8 if(n <= 10) else 1.0/2
     return (np.arange(n) + 1 - a)/(n + 1 - 2*a)

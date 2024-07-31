@@ -274,7 +274,10 @@ def mr(args, log):
     import modas.mr as MR
 
     utils_path = subprocess.check_output('locate modas/utils', shell=True, text=True, encoding='utf-8')
-    utils_path = '/'.join(re.search('\n(.*site-packages.*)\n', utils_path).group(1).split('/')[:-1])
+    # utils_path = '/'.join(re.search('\n(.*site-packages.*)\n', utils_path).group(1).split('/')[:-1])
+    utils_path = re.search('\n(.*site-packages.*)\n', utils_path).group(1)
+    if not utils_path.endswith('utils'):
+        utils_path = '/'.join(utils_path.split('/')[:-1])
 
     log.log('begin Mendelian Randomization analysis...')
     if not os.path.exists(args.exposure):
@@ -353,7 +356,10 @@ def visual(args, log):
     import modas.visual as vis
 
     utils_path = subprocess.check_output('locate modas/utils', shell=True, text=True, encoding='utf-8')
-    utils_path = '/'.join(re.search('\n(.*site-packages.*)\n', utils_path).group(1).split('/')[:-1])
+    # utils_path = '/'.join(re.search('\n(.*site-packages.*)\n', utils_path).group(1).split('/')[:-1])
+    utils_path = re.search('\n(.*site-packages.*)\n', utils_path).group(1)
+    if not utils_path.endswith('utils'):
+        utils_path = '/'.join(utils_path.split('/')[:-1])
 
     log.log('begin genome-wide association analysis and visualization')
     if not os.path.exists(args.phe):

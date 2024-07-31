@@ -24,7 +24,10 @@ robjects.r('options(datatable.showProgress = FALSE)')
 warnings.filterwarnings("ignore")
 
 utils_path = subprocess.check_output('locate modas/utils', shell=True, text=True, encoding='utf-8')
-utils_path = '/'.join(re.search('\n(.*site-packages.*)\n', utils_path).group(1).split('/')[:-1])
+#utils_path = '/'.join(re.search('\n(.*site-packages.*)\n', utils_path).group(1).split('/')[:-1])
+utils_path = re.search('\n(.*site-packages.*)\n', utils_path).group(1)
+if not utils_path.endswith('utils'):
+    utils_path = '/'.join(utils_path.split('/')[:-1])
 
 
 # def gwas(phe, geno, num_threads, phe_fn):

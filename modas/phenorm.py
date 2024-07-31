@@ -4,6 +4,9 @@ from scipy import stats
 from scipy.stats import norm
 from sklearn.preprocessing import MinMaxScaler
 import warnings
+import subprocess
+import re
+
 
 def abundance_filter(d, abundance):
     return d.loc[:, d.mean() >= abundance]
@@ -92,24 +95,39 @@ def pc_calc(bed, pc_num):
         from rpy2.robjects.packages import importr
         from rpy2.robjects import pandas2ri
         from rpy2.rinterface_lib.embedded import RRuntimeError
+        import rpy2.robjects as robjects
         pandas2ri.activate()
 
         warnings.filterwarnings("ignore")
         base = importr('base')
+        utils = importr('utils')
+        if not base.require('bigsnpr', quietly=True)[0]:
+            utils_path = subprocess.check_output('locate modas/utils', shell=True, text=True, encoding='utf-8')
+            # utils_path = '/'.join(re.search('\n(.*site-packages.*)\n', utils_path).group(1).split('/')[:-1])
+            utils_path = re.search('\n(.*site-packages.*)\n', utils_path).group(1)
+            if not utils_path.endswith('utils'):
+                utils_path = '/'.join(utils_path.split('/')[:-1])
+            utils.install_packages(utils_path + '/Matrix_1.6-5.tar.gz', repos=robjects.rinterface.NULL, type='source',
+                                   quiet=True)
+            utils.install_packages('bigsnpr', dependence=True, repos='https://cloud.r-project.org', quiet=True)
+        robjects.r['options'](warn=-1)
         bigsnpr = importr('bigsnpr')
         bigstatsr = importr('bigstatsr')
 
         base.sink('/dev/null')
         g = bigsnpr.snp_readBed(bed, backingfile=base.tempfile())
         g = bigsnpr.snp_attach(g)
-        svd = bigsnpr.snp_autoSVD(g[0], infos_chr=g[2]['chromosome'], ncores=1,
-                                  infos_pos=g[2]['physical.pos'], thr_r2=np.nan, k=pc_num)
+        # svd = bigsnpr.snp_autoSVD(g.rx2[0], infos_chr=g[2]['chromosome'], ncores=1,
+        #                           infos_pos=g[2]['physical.pos'], thr_r2=np.nan, k=pc_num)
+        svd = bigsnpr.snp_autoSVD(g.rx2('genotypes'), infos_chr=g.rx2('map').rx2('chromosome'),
+                                  infos_pos=g.rx2('map').rx2('physical.pos'), thr_r2=np.nan, k=pc_num)
         base.sink()
     except RRuntimeError:
         return None
     else:
         pc = bigstatsr.predict_big_SVD(svd)
-        pc = base.data_frame(pc, row_names=g[1]['sample.ID'])
+        # pc = base.data_frame(pc, row_names=g[1]['sample.ID'])
         #pc = base.cbind(pc.rownames, pc)
+        pc = pd.DataFrame(pc, index=g.rx2('fam').rx2('sample.ID'))
         pc.columns = ['PC' + str(i) for i in range(1, pc_num+1)]
         return pc

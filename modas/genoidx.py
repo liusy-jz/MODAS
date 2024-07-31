@@ -10,6 +10,8 @@ import numpy as np
 import pandas as pd
 from collections import Counter
 import struct
+import subprocess
+import re
 
 warnings.filterwarnings("ignore")
 
@@ -204,6 +206,12 @@ def snp_clumping(bed, r2, out):
     base = importr('base')
     utils = importr('utils')
     if not base.require('bigsnpr')[0]:
+        utils_path = subprocess.check_output('locate modas/utils', shell=True, text=True, encoding='utf-8')
+        # utils_path = '/'.join(re.search('\n(.*site-packages.*)\n', utils_path).group(1).split('/')[:-1])
+        utils_path = re.search('\n(.*site-packages.*)\n', utils_path).group(1)
+        if not utils_path.endswith('utils'):
+            utils_path = '/'.join(utils_path.split('/')[:-1])
+        utils.install_packages(utils_path + '/Matrix_1.6-5.tar.gz', repos=robjects.rinterface.NULL, type='source', quiet=True)
         utils.install_packages('bigsnpr', dependence=True, repos='https://cloud.r-project.org', quiet=True)
     robjects.r['options'](warn=-1)
     robjects.r('options(datatable.showProgress = FALSE)')
@@ -211,7 +219,7 @@ def snp_clumping(bed, r2, out):
     bigsnpr = importr('bigsnpr')
     g = bigsnpr.snp_readBed(bed, backingfile=base.tempfile())
     g = bigsnpr.snp_attach(g)
-    snp_keep = bigsnpr.snp_clumping(g[0], infos_chr=g[2]['chromosome'], infos_pos=g[2]['physical.pos'],
+    snp_keep = bigsnpr.snp_clumping(g.rx2('genotypes'), infos_chr=g.rx2('map').rx2('chromosome'), infos_pos=g.rx2('map').rx2('physical.pos'),
                                     thr_r2=r2, ncores=1)
     g_clump = bigsnpr.subset_bigSNP(g, ind_col=snp_keep)
     g_clump = bigsnpr.snp_attach(g_clump)

@@ -18,12 +18,15 @@ base = importr('base')
 utils = importr('utils')
 
 utils_path = subprocess.check_output('locate modas/utils', shell=True, text=True, encoding='utf-8')
-utils_path = '/'.join(re.search('\n(.*site-packages.*)\n', utils_path).group(1).split('/')[:-1])
+#utils_path = '/'.join(re.search('\n(.*site-packages.*)\n', utils_path).group(1).split('/')[:-1])
+utils_path = re.search('\n(.*site-packages.*)\n', utils_path).group(1)
+if not utils_path.endswith('utils'):
+    utils_path = '/'.join(utils_path.split('/')[:-1])
 
 if not base.require('rMVP')[0]:
-    utils.install_packages(np.array(['data.table', 'ggplot2', 'ggsignif', 'Matrix', 'bigmemory', 'RcppProgress', 'BH']), repos='https://cloud.r-project.org', quiet=True)
+    utils.install_packages(np.array(['data.table', 'ggplot2', 'ggsignif', 'bigmemory', 'RcppProgress', 'BH']), repos='https://cloud.r-project.org', quiet=True)
     utils.install_packages(utils_path + '/rMVP_1.0.6_modify.tar.gz', repos=robjects.rinterface.NULL, type='source', quiet=True)
-    utils.install_packages('bigsnpr', dependence=True, repos='https://cloud.r-project.org', quiet=True)
+    # utils.install_packages('bigsnpr', dependence=True, repos='https://cloud.r-project.org', quiet=True)
 rMVP = importr('rMVP')
 bigmemory = importr('bigmemory')
 
